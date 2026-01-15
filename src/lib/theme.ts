@@ -1,4 +1,6 @@
-export type Theme = "light" | "dark";
+import { THEME } from '@/enums';
+
+export type Theme = typeof THEME.valueType;
 
 const THEME_KEY = "theme";
 

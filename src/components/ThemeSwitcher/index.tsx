@@ -2,7 +2,7 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-13 17:03:51
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-13 17:25:56
+ * @LastEditTime: 2026-01-15 15:36:08
  * @Description: 主题切换
  */
 import { Moon, Sun } from "lucide-react";
@@ -10,13 +10,14 @@ import { AnimatePresence, motion } from "motion/react";
 import { type FC, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { THEME } from '@/enums';
 import { getInitialTheme, type Theme } from "@/lib/theme";
 
 const THEME_KEY = "theme";
 
 const ThemeSwitcher: FC = () => {
   const [theme, setTheme] = useState<Theme>(getInitialTheme());
-  const isDark = theme === "dark";
+  const isDark = theme === THEME.DARK;
 
   // 是否支持 View Transition
   const enableTransitions = () =>
@@ -29,8 +30,8 @@ const ThemeSwitcher: FC = () => {
 
     // 不支持动画，直接切
     if (!enableTransitions()) {
-      const next = isDark ? "light" : "dark";
-      root.classList.toggle("dark", next === "dark");
+      const next = isDark ? THEME.LIGHT : THEME.DARK;
+      root.classList.toggle(THEME.DARK, next === THEME.DARK);
       localStorage.setItem(THEME_KEY, next);
       setTheme(next);
       return;
@@ -38,8 +39,8 @@ const ThemeSwitcher: FC = () => {
 
     // ⚠️ 关键：同步修改 DOM，View Transition 才能捕获
     await document.startViewTransition(() => {
-      const next = root.classList.contains("dark") ? "light" : "dark";
-      root.classList.toggle("dark", next === "dark");
+      const next = root.classList.contains(THEME.DARK) ? THEME.LIGHT : THEME.DARK;
+      root.classList.toggle(THEME.DARK, next === THEME.DARK);
       localStorage.setItem(THEME_KEY, next);
       setTheme(next); // React 状态同步 UI
       return next;

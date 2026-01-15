@@ -2,19 +2,19 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-13 17:48:31
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-15 11:00:07
+ * @LastEditTime: 2026-01-15 15:33:49
  * @Description: 设备框架
  */
-import { DEVICES, type DeviceType } from "@/lib/devices.config";
+import { DEVICES } from '@/enums';
 import { cn } from '@/lib/utils';
 
 interface DeviceFrameProps {
-  type: DeviceType;
+  type: typeof DEVICES.valueType;
   url: string;
 }
 
 export default function DeviceFrame({ type, url }: DeviceFrameProps) {
-  const device = DEVICES[type];
+  const device = DEVICES.raw(type);
 
   // inner 决定比例
   const innerAspect = device.inner.width / device.inner.height;

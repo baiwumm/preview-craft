@@ -2,10 +2,19 @@ import { useState } from 'react';
 
 import DeviceFrame from '@/components/DeviceFrame';
 import Header from '@/components/Header';
+import { DEVICES } from '@/enums';
 
 function App() {
   // 网址
   const [url, setUrl] = useState(import.meta.env.VITE_APP_URL);
+
+  // 各设备独立 URL
+  const [deviceUrls, setDeviceUrls] = useState<Record<typeof DEVICES.valueType, string>>({
+    desktop: '',
+    laptop: '',
+    tablet: '',
+    mobile: '',
+  });
   return (
     <main className="w-300 mx-auto min-h-screen grid grid-rows-[auto_1fr]">
       {/* 顶部操作栏 */}
@@ -13,10 +22,9 @@ function App() {
       {/* 设备预览 */}
       <div className="flex items-center justify-center">
         <div className="relative w-full h-162.5">
-          <DeviceFrame url={url} type='desktop' />
-          <DeviceFrame url={url} type='laptop' />
-          <DeviceFrame url={url} type='tablet' />
-          <DeviceFrame url={url} type='mobile' />
+          {DEVICES.items.map(({ value }) => (
+            <DeviceFrame key={value} url={deviceUrls[value] || url} type={value} />
+          ))}
         </div>
       </div>
     </main>

@@ -14,6 +14,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "enum-plus": "^3.1.6",
     "lucide-react": "^0.562.0",
     "motion": "^12.26.1",
     "radix-ui": "^1.4.3",
