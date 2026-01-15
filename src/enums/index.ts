@@ -15,6 +15,7 @@ export const DEVICES = Enum({
   DESKTOP: {
     value: 'desktop',
     label: '电脑',
+    icon: 'monitor',
     shell: {
       width: 620,
       aspect: 671 / 629,
@@ -32,6 +33,7 @@ export const DEVICES = Enum({
   LAPTOP: {
     value: 'laptop',
     label: '笔记本',
+    icon: 'laptop',
     shell: {
       width: 520,
       aspect: 969 / 579,
@@ -49,6 +51,7 @@ export const DEVICES = Enum({
   TABLET: {
     value: 'tablet',
     label: '平板',
+    icon: 'tablet',
     shell: {
       width: 300,
       aspect: 981 / 1293,
@@ -66,6 +69,7 @@ export const DEVICES = Enum({
   MOBILE: {
     value: 'mobile',
     label: '手机',
+    icon: 'smartphone',
     shell: {
       width: 160,
       aspect: 1000 / 2025,

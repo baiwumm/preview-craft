@@ -1,20 +1,18 @@
 import { THEME } from '@/enums';
 
-export type Theme = typeof THEME.valueType;
-
 const THEME_KEY = "theme";
 
-export function getInitialTheme(): Theme {
-  const stored = localStorage.getItem(THEME_KEY) as Theme | null;
+export function getInitialTheme(): App.Theme {
+  const stored = localStorage.getItem(THEME_KEY) as App.Theme | null;
   if (stored) return stored;
 
   return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+    ? THEME.DARK
+    : THEME.LIGHT;
 }
 
-export function applyTheme(theme: Theme) {
+export function applyTheme(theme: App.Theme) {
   const root = document.documentElement;
-  root.classList.toggle("dark", theme === "dark");
+  root.classList.toggle(THEME.DARK, theme === THEME.DARK);
   localStorage.setItem(THEME_KEY, theme);
 }

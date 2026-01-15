@@ -2,14 +2,14 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-13 17:48:31
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-15 15:33:49
+ * @LastEditTime: 2026-01-15 16:04:27
  * @Description: 设备框架
  */
 import { DEVICES } from '@/enums';
 import { cn } from '@/lib/utils';
 
 interface DeviceFrameProps {
-  type: typeof DEVICES.valueType;
+  type: App.DeviceType;
   url: string;
 }
 
