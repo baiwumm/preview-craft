@@ -1,4 +1,4 @@
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 import { TriangleAlert } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FC, useState } from 'react';
@@ -11,11 +11,15 @@ import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
 import { MODE } from '@/enums';
 import { normalizeAndValidate } from '@/lib/utils';
 
+const DEFAULT_INPUT_URL = normalizeAndValidate(
+  import.meta.env.VITE_APP_URL ?? 'baiwumm.com'
+)
+
 const App: FC = () => {
   // 当前模式
   const [mode, setMode] = useState<App.Mode>(MODE.PREVIEW);
   // 输入态（给 Header）
-  const [url, setUrl] = useState(import.meta.env.VITE_APP_URL ?? '');
+  const [url, setUrl] = useState(DEFAULT_INPUT_URL || 'https://baiwumm.com');
   const [deviceUrls, setDeviceUrls] = useState<Record<App.DeviceType, string>>({
     desktop: '',
     laptop: '',
@@ -30,7 +34,6 @@ const App: FC = () => {
   // 点击预览回调
   const handlePreview = () => {
     const validUrl = normalizeAndValidate(url)
-
     if (!validUrl) {
       toast.custom(
         (t) => (

@@ -16,44 +16,27 @@ export function normalizeUrl(input: string) {
   return `https://${input}`;
 }
 
+export function isValidHttpUrl(input: string): boolean {
+  try {
+    const u = new URL(input)
+
+    if (!['http:', 'https:'].includes(u.protocol)) return false
+    if (!u.hostname.includes('.')) return false
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * @description: 校验 url
  * @param {string} input
  */
 export function normalizeAndValidate(input: string): string | null {
-  function looksLikeUrl(input: string) {
-    const v = input.trim()
-
-    // 最低门槛
-    if (!v) return false
-    if (v.includes(' ')) return false
-
-    // 有域名特征
-    if (v.includes('.') || v.startsWith('http')) {
-      return true
-    }
-
-    return false
-  }
-
-  if (!looksLikeUrl(input)) return null
+  if (!input.trim()) return null
 
   const normalized = normalizeUrl(input)
 
-  try {
-    const u = new URL(normalized)
-
-    if (!['http:', 'https:'].includes(u.protocol)) {
-      return null
-    }
-
-    // hostname 至少包含一个 .
-    if (!u.hostname.includes('.')) {
-      return null
-    }
-
-    return u.href
-  } catch {
-    return null
-  }
+  return isValidHttpUrl(normalized) ? normalized : null
 }
