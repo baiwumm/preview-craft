@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1](https://github.com/baiwumm/preview-craft/compare/1.2.0...1.2.1) (2026-01-16)
+
+### 👷‍ Build System | 构建
+
+* 解决打包报错的问题 ([b406e1b](https://github.com/baiwumm/preview-craft/commit/b406e1b3661cb97fea40b9ce53af2b59b2163d73))
+
 ## [1.2.0](https://github.com/baiwumm/preview-craft/compare/1.1.0...1.2.0) (2026-01-16)
 
 ### ✨ Features | 新功能
