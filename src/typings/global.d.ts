@@ -4,4 +4,10 @@ declare namespace App {
 
   // 设备类型
   type DeviceType = typeof import('@/enums').DEVICES.valueType;
+
+  // 模式
+  type Mode = typeof import('@/enums').MODE.valueType;
+
+  // 导出格式
+  type ExportFormat = typeof import('@/enums').EXPORT_FORMAT.valueType;
 }
