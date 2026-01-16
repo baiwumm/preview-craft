@@ -1,15 +1,17 @@
 import { TriangleAlert } from 'lucide-react';
+import { motion } from 'motion/react';
 import { type FC, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 
 import Header from '@/components/Header';
 import PreviewContainer from '@/components/PreviewContainer';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
+import { MODE } from '@/enums';
 import { normalizeAndValidate } from '@/lib/utils';
 
 const App: FC = () => {
   // 当前模式
-  const [mode, setMode] = useState<App.Mode>('export');
+  const [mode, setMode] = useState<App.Mode>(MODE.PREVIEW);
   // 输入态（给 Header）
   const [url, setUrl] = useState(import.meta.env.VITE_APP_URL ?? '');
   const [deviceUrls, setDeviceUrls] = useState<Record<App.DeviceType, string>>({
@@ -57,7 +59,12 @@ const App: FC = () => {
   }
   return (
     <>
-      <main className="w-300 mx-auto min-h-screen grid grid-rows-[auto_1fr]">
+      <motion.main
+        className="w-300 mx-auto min-h-screen grid grid-rows-[auto_1fr]"
+        initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        transition={{ duration: 0.75 }}
+      >
         {/* 顶部操作栏 */}
         <Header
           url={url}
@@ -70,7 +77,7 @@ const App: FC = () => {
         />
         {/* 预览区域 */}
         <PreviewContainer url={activeUrl} deviceUrls={activeDeviceUrls} mode={mode} />
-      </main>
+      </motion.main>
       <Toaster position="top-center" />
     </>
   )
