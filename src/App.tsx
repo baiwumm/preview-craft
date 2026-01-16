@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import { TriangleAlert } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FC, useState } from 'react';
@@ -82,6 +83,7 @@ const App: FC = () => {
       <Toaster position="top-center" />
       {/* GitHub Corner */}
       <GithubCorner />
+      <Analytics />
     </>
   )
 }
