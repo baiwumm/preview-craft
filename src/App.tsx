@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { type FC, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 
+import GithubCorner from '@/components/GithubCorner';
 import Header from '@/components/Header';
 import PreviewContainer from '@/components/PreviewContainer';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
@@ -79,6 +80,8 @@ const App: FC = () => {
         <PreviewContainer url={activeUrl} deviceUrls={activeDeviceUrls} mode={mode} />
       </motion.main>
       <Toaster position="top-center" />
+      {/* GitHub Corner */}
+      <GithubCorner />
     </>
   )
 }
