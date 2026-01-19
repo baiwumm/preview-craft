@@ -2,17 +2,19 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-15 14:17:45
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-19 15:32:00
+ * @LastEditTime: 2026-01-19 16:34:22
  * @Description: 顶部操作栏
  */
 "use client";
 import { snapdom } from '@zumer/snapdom';
-import { Download, Eye, Globe } from "lucide-react";
+import { Download, Eye, Globe, TriangleAlert } from "lucide-react";
 import { DynamicIcon } from 'lucide-react/dynamic';
 import { type Dispatch, type FC, type KeyboardEventHandler, type SetStateAction, useState } from 'react';
+import { toast } from 'sonner';
 
 import ModeHint from '@/components/ModeHint';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
+import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input, InputAddon, InputGroup, InputWrapper } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -28,9 +30,10 @@ type HeaderProps = {
   onPreview: VoidFunction;
   mode: App.Mode;
   setMode: Dispatch<SetStateAction<App.Mode>>;
+  isPuppeteerSupported: boolean;
 }
 
-const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPreview, mode, setMode }) => {
+const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPreview, mode, setMode, isPuppeteerSupported }) => {
   // 导出格式
   const [exportFormat, setExportFormat] = useState<App.ExportFormat>(EXPORT_FORMAT.PNG);
   // 导出 Loading
@@ -53,16 +56,60 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
   // 导出图片
   const handleExport = async () => {
     const el = document.getElementById('preview');
-    if (!el) return
-    setExportLoading(true)
-    await snapdom.download(el, {
-      type: exportFormat,
-      filename: 'preview',
-      useProxy: "https://proxy.corsfix.com/?",
-      cache: 'disabled'
-    }).finally(() => {
-      setExportLoading(false)
-    });
+    if (!el) {
+      toast.custom(
+        (t) => (
+          <Alert variant="destructive" onClose={() => toast.dismiss(t)}>
+            <AlertIcon>
+              <TriangleAlert />
+            </AlertIcon>
+            <AlertTitle>指定元素不存在!</AlertTitle>
+          </Alert>
+        ),
+        {
+          duration: 3000,
+        },
+      )
+      return
+    }
+    // 开启 Loading
+    setExportLoading(true);
+    // 预览模式，如果支持 puppeteer，则直接导出图片
+    if (mode === MODE.PREVIEW && isPuppeteerSupported) {
+      const url = window.location.origin + window.location.pathname;
+
+      const res = await fetch('/api/puppeteer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          selector: '#preview',
+        }),
+      }).finally(() => {
+        setExportLoading(false)
+      });
+
+      const blob = await res.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = 'preview.png';
+      a.click();
+
+      URL.revokeObjectURL(downloadUrl);
+    }
+    // 导出模式
+    if (mode === MODE.EXPORT) {
+      await snapdom.download(el, {
+        type: exportFormat,
+        filename: 'preview',
+        useProxy: "https://proxy.corsfix.com/?",
+        cache: 'disabled'
+      }).finally(() => {
+        setExportLoading(false)
+      });
+    }
   };
   return (
     <div className="p-4 flex flex-col gap-2">
@@ -123,7 +170,7 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
             />
           </InputWrapper>
         </div>
-        <Button variant="secondary" size='sm' onClick={handlePreview}>
+        <Button variant="secondary" size='sm' disabled={exportLoading} onClick={handlePreview}>
           <Eye />
           预览
         </Button>
@@ -137,7 +184,7 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
             ))}
           </SelectContent>
         </Select>
-        <Button variant="secondary" size='sm' disabled={exportLoading} onClick={handleExport}>
+        <Button variant="secondary" size='sm' disabled={!isPuppeteerSupported || exportLoading} onClick={handleExport}>
           {exportLoading ? (
             <Spinner variant="circle" />
           ) : (

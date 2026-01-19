@@ -2,7 +2,7 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-19 10:03:35
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-19 10:56:04
+ * @LastEditTime: 2026-01-19 16:00:52
  * @Description: 预览页面
  */
 "use client";
@@ -15,6 +15,7 @@ import Header from '@/components/Header';
 import PreviewContainer from '@/components/PreviewContainer';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
 import { MODE } from '@/enums';
+import { usePuppeteerSupport } from '@/hooks/usePuppeteerSupport';
 import { normalizeAndValidate } from '@/lib/utils';
 
 const DEFAULT_INPUT_URL = normalizeAndValidate(
@@ -23,6 +24,8 @@ const DEFAULT_INPUT_URL = normalizeAndValidate(
 
 const App: FC = () => {
   const [mounted, setMounted] = useState(false);
+  // 是否支持 puppeteer
+  const { isPuppeteerSupported } = usePuppeteerSupport();
   // 当前模式
   const [mode, setMode] = useState<App.Mode>(MODE.PREVIEW);
   // 输入态（给 Header）
@@ -94,6 +97,7 @@ const App: FC = () => {
         onPreview={handlePreview}
         mode={mode}
         setMode={setMode}
+        isPuppeteerSupported={isPuppeteerSupported}
       />
       {/* 预览区域 */}
       <PreviewContainer url={activeUrl} deviceUrls={activeDeviceUrls} mode={mode} />
