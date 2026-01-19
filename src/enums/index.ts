@@ -106,3 +106,12 @@ export const EXPORT_FORMAT = Enum({
   WEBP: { value: 'webp', label: 'WEBP' },
   JPG: { value: 'jpg', label: 'JPG' }
 });
+
+/**
+ * @description: 截图状态
+ */
+export const SCREEN_STATUS = Enum({
+  LOADING: { value: 'loading', label: '截图中...' },
+  SUCCESS: { value: 'success', label: '截图成功' },
+  ERROR: { value: 'error', label: '截图失败' },
+});
