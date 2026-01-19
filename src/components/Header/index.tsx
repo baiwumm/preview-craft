@@ -2,7 +2,7 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-15 14:17:45
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-19 14:42:25
+ * @LastEditTime: 2026-01-19 15:32:00
  * @Description: 顶部操作栏
  */
 "use client";
@@ -11,6 +11,7 @@ import { Download, Eye, Globe } from "lucide-react";
 import { DynamicIcon } from 'lucide-react/dynamic';
 import { type Dispatch, type FC, type KeyboardEventHandler, type SetStateAction, useState } from 'react';
 
+import ModeHint from '@/components/ModeHint';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
 import { Input, InputAddon, InputGroup, InputWrapper } from '@/components/ui/input';
@@ -64,7 +65,7 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
     });
   };
   return (
-    <div className="p-4">
+    <div className="p-4 flex flex-col gap-2">
       <div className="flex gap-2 items-center justify-center">
         <Select value={mode} onValueChange={(value) => setMode(value as App.Mode)}>
           <SelectTrigger className="w-40 text-xs">
@@ -136,7 +137,7 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
             ))}
           </SelectContent>
         </Select>
-        <Button variant="secondary" size='sm' disabled={mode !== MODE.EXPORT || exportLoading} onClick={handleExport}>
+        <Button variant="secondary" size='sm' disabled={exportLoading} onClick={handleExport}>
           {exportLoading ? (
             <Spinner variant="circle" />
           ) : (
@@ -146,6 +147,8 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
         </Button>
         <ThemeSwitcher />
       </div>
+      {/* 截图说明 */}
+      <ModeHint mode={mode} />
     </div>
   )
 }

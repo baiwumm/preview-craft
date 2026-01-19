@@ -2,7 +2,7 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-13 17:48:31
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-19 14:57:31
+ * @LastEditTime: 2026-01-19 15:39:57
  * @Description: 设备框架
  */
 'use client';
@@ -11,7 +11,6 @@ import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { Alert, AlertContent, AlertIcon, AlertTitle } from '@/components/ui/alert';
 import { Spinner } from "@/components/ui/spinner";
 import { DEVICES, MODE, THEME } from '@/enums';
 import { useScreenshot } from '@/hooks/useScreenshot';
@@ -106,15 +105,9 @@ export default function DeviceFrame({ type, url, mode }: DeviceFrameProps) {
           ) : screenshotUrl ? (
             <Image src={screenshotUrl || ''} alt={device.label} fill unoptimized />
           ) : (
-            <div className="absolute inset-0 flex flex-col justify-center items-center gap-2 bg-default-100 text-default-foreground">
-              <Alert variant="destructive" className="size-max">
-                <AlertIcon>
-                  <TriangleAlert />
-                </AlertIcon>
-                <AlertContent>
-                  <AlertTitle>截图失败!</AlertTitle>
-                </AlertContent>
-              </Alert>
+            <div className="absolute inset-0 flex flex-col justify-center items-center gap-1 bg-default-100 text-default-foreground text-red-500">
+              <TriangleAlert />
+              <span className="text-xs">截图失败!</span>
             </div>
           )}
         </div>
