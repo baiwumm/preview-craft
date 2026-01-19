@@ -7,7 +7,7 @@
 
 /** Colors **/
 :root {
-  font-family: 'Maple Mono CN',system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Maple Mono CN', system-ui, Avenir, Helvetica, Arial, sans-serif;
   --background: oklch(0.9761 0.0041 91.4461);
   --foreground: oklch(0.2417 0.0298 269.8827);
   --card: oklch(1.0000 0 0);
@@ -161,6 +161,7 @@
     from {
       transform: translateX(0);
     }
+
     to {
       transform: translateX(calc(-100% - var(--gap)));
     }
@@ -170,6 +171,7 @@
     from {
       transform: translateY(0);
     }
+
     to {
       transform: translateY(calc(-100% - var(--gap)));
     }
@@ -193,21 +195,63 @@
   }
 }
 
-/** Custom Scrollbar **/
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
   ::-webkit-scrollbar {
     width: 5px;
   }
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
     background: var(--input);
     border-radius: 5px;
   }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--input) transparent;
+  }
+
+  .github-corner:hover .octo-arm {
+    animation: octocat-wave 560ms ease-in-out
+  }
+
+  @keyframes octocat-wave {
+
+    0%,
+    100% {
+      transform: rotate(0)
+    }
+
+    20%,
+    60% {
+      transform: rotate(-25deg)
+    }
+
+    40%,
+    80% {
+      transform: rotate(10deg)
+    }
+  }
+
+  @media (max-width:500px) {
+    .github-corner:hover .octo-arm {
+      animation: none
+    }
+
+    .github-corner .octo-arm {
+      animation: octocat-wave 560ms ease-in-out
+    }
   }
 }
 
@@ -215,10 +259,12 @@
 @utility container {
   margin-inline: auto;
   padding-inline: 1.5rem;
-  @media (width >= --theme(--breakpoint-sm)) {
+
+  @media (width >=--theme(--breakpoint-sm)) {
     max-width: none;
   }
-  @media (width >= 1440px) {
+
+  @media (width >=1440px) {
     padding-inline: 2rem;
     max-width: 1440px;
   }
@@ -226,21 +272,12 @@
 
 @theme {
   --font-sans:
-    'Maple Mono CN','Geist', 'Geist Fallback', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Maple Mono CN', 'Geist', 'Geist Fallback', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
     'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-mono: 'Maple Mono CN',ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-mono: 'Maple Mono CN', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 /** Smooth scroll **/
 html {
   scroll-behavior: smooth;
-}
-/*---break---*/
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
 }

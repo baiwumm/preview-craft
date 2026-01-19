@@ -13,14 +13,7 @@ export default function GithubCorner() {
         height="80"
         viewBox="0 0 250 250"
         aria-hidden="true"
-        style={{
-          fill: "#151513",
-          color: "#fff",
-          position: "absolute",
-          top: 0,
-          right: 0,
-          border: 0,
-        }}
+        className="fill-primary text-background absolute top-0 right-0 border-none"
       >
         <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z" />
         <path
