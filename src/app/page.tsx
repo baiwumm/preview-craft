@@ -1,10 +1,16 @@
-import { Analytics } from "@vercel/analytics/react";
+/*
+ * @Author: 白雾茫茫丶<baiwumm.com>
+ * @Date: 2026-01-19 10:03:35
+ * @LastEditors: 白雾茫茫丶<baiwumm.com>
+ * @LastEditTime: 2026-01-19 10:56:04
+ * @Description: 预览页面
+ */
+"use client";
 import { TriangleAlert } from 'lucide-react';
 import { motion } from 'motion/react';
-import { type FC, useState } from 'react';
-import { toast, Toaster } from 'sonner';
+import { type FC, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
-import GithubCorner from '@/components/GithubCorner';
 import Header from '@/components/Header';
 import PreviewContainer from '@/components/PreviewContainer';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
@@ -12,10 +18,11 @@ import { MODE } from '@/enums';
 import { normalizeAndValidate } from '@/lib/utils';
 
 const DEFAULT_INPUT_URL = normalizeAndValidate(
-  import.meta.env.VITE_APP_URL ?? 'baiwumm.com'
+  process.env.NEXT_PUBLIC_PREVIEW_URL ?? 'baiwumm.com'
 )
 
 const App: FC = () => {
+  const [mounted, setMounted] = useState(false);
   // 当前模式
   const [mode, setMode] = useState<App.Mode>(MODE.PREVIEW);
   // 输入态（给 Header）
@@ -62,33 +69,36 @@ const App: FC = () => {
     setActiveUrl(validUrl)
     setActiveDeviceUrls(nextDeviceUrls)
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!mounted) {
+    return null
+  }
   return (
-    <>
-      <motion.main
-        className="w-300 mx-auto min-h-screen grid grid-rows-[auto_1fr]"
-        initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-        transition={{ duration: 0.75 }}
-      >
-        {/* 顶部操作栏 */}
-        <Header
-          url={url}
-          setUrl={setUrl}
-          deviceUrls={deviceUrls}
-          setDeviceUrls={setDeviceUrls}
-          onPreview={handlePreview}
-          mode={mode}
-          setMode={setMode}
-        />
-        {/* 预览区域 */}
-        <PreviewContainer url={activeUrl} deviceUrls={activeDeviceUrls} mode={mode} />
-      </motion.main>
-      <Toaster position="top-center" />
-      {/* GitHub Corner */}
-      <GithubCorner />
-      <Analytics />
-    </>
+    <motion.main
+      className="w-300 mx-auto min-h-screen grid grid-rows-[auto_1fr]"
+      initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={{ duration: 0.75 }}
+    >
+      {/* 顶部操作栏 */}
+      <Header
+        url={url}
+        setUrl={setUrl}
+        deviceUrls={deviceUrls}
+        setDeviceUrls={setDeviceUrls}
+        onPreview={handlePreview}
+        mode={mode}
+        setMode={setMode}
+      />
+      {/* 预览区域 */}
+      <PreviewContainer url={activeUrl} deviceUrls={activeDeviceUrls} mode={mode} />
+    </motion.main>
   )
 }
 
-export default App
+export default App;

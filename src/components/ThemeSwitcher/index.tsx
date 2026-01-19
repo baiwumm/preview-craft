@@ -2,21 +2,22 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-13 17:03:51
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-15 16:04:14
+ * @LastEditTime: 2026-01-19 10:43:02
  * @Description: 主题切换
  */
+"use client";
 import { Moon, Sun } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { type FC, useState } from "react";
+import { useTheme } from 'next-themes';
+import { type FC } from "react";
 
 import { Button } from "@/components/ui/button";
 import { THEME } from '@/enums';
-import { getInitialTheme } from "@/lib/theme";
 
 const THEME_KEY = "theme";
 
 const ThemeSwitcher: FC = () => {
-  const [theme, setTheme] = useState<App.Theme>(getInitialTheme());
+  const { theme, setTheme } = useTheme();
   const isDark = theme === THEME.DARK;
 
   // 是否支持 View Transition

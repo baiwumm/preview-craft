@@ -2,9 +2,10 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-15 14:17:45
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-16 15:19:12
+ * @LastEditTime: 2026-01-19 14:42:25
  * @Description: 顶部操作栏
  */
+"use client";
 import { snapdom } from '@zumer/snapdom';
 import { Download, Eye, Globe } from "lucide-react";
 import { DynamicIcon } from 'lucide-react/dynamic';
@@ -56,6 +57,7 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
     await snapdom.download(el, {
       type: exportFormat,
       filename: 'preview',
+      useProxy: "https://proxy.corsfix.com/?",
       cache: 'disabled'
     }).finally(() => {
       setExportLoading(false)
