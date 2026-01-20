@@ -2,7 +2,7 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-19 10:03:35
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-19 16:00:52
+ * @LastEditTime: 2026-01-20 09:18:00
  * @Description: 预览页面
  */
 "use client";
@@ -11,6 +11,7 @@ import { motion } from 'motion/react';
 import { type FC, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import PreviewContainer from '@/components/PreviewContainer';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
@@ -83,7 +84,7 @@ const App: FC = () => {
   }
   return (
     <motion.main
-      className="w-300 mx-auto min-h-screen grid grid-rows-[auto_1fr]"
+      className="w-300 mx-auto min-h-screen grid grid-rows-[auto_1fr_auto]"
       initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
       animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       transition={{ duration: 0.75 }}
@@ -101,6 +102,8 @@ const App: FC = () => {
       />
       {/* 预览区域 */}
       <PreviewContainer url={activeUrl} deviceUrls={activeDeviceUrls} mode={mode} />
+      {/* 底部版权 */}
+      <Footer />
     </motion.main>
   )
 }
