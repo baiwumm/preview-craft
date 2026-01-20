@@ -2,7 +2,7 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-15 14:17:45
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-19 16:34:22
+ * @LastEditTime: 2026-01-20 09:23:27
  * @Description: 顶部操作栏
  */
 "use client";
@@ -121,7 +121,7 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
           <SelectContent>
             {MODE.items.map(({ value, label, raw }) => (
               <SelectItem key={value} value={value}>
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-2 text-xs">
                   <DynamicIcon name={raw.icon} className="size-4 opacity-60" />
                   <span>{label}</span>
                 </span>
@@ -180,7 +180,7 @@ const Header: FC<HeaderProps> = ({ url, setUrl, deviceUrls, setDeviceUrls, onPre
           </SelectTrigger>
           <SelectContent>
             {EXPORT_FORMAT.items.map(({ value, label }) => (
-              <SelectItem key={value} value={value} disabled={value !== EXPORT_FORMAT.PNG}>{label} </SelectItem>
+              <SelectItem key={value} value={value} disabled={value !== EXPORT_FORMAT.PNG} className="text-xs">{label} </SelectItem>
             ))}
           </SelectContent>
         </Select>

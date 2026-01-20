@@ -2,7 +2,7 @@
  * @Author: 白雾茫茫丶<baiwumm.com>
  * @Date: 2026-01-19 15:29:57
  * @LastEditors: 白雾茫茫丶<baiwumm.com>
- * @LastEditTime: 2026-01-19 15:36:24
+ * @LastEditTime: 2026-01-20 09:24:34
  * @Description: 截图说明
  */
 import { AnimatePresence, motion } from 'motion/react';
@@ -39,7 +39,7 @@ const ModeHint: FC<ModeHintProps> = ({ mode }) => {
               target="_blank"
               rel="noopener noreferrer"
               className="text-secondary hover:text-primary transition-colors"
-            > Microlink API</a> 提供，属于“云端代拍”方案，速度快，但不对像素级完美负责.
+            > Microlink API</a> 提供，有速率限制，属于“云端代拍”方案，速度快，但不对像素级完美负责.
           </motion.p>
         )}
       </AnimatePresence>
