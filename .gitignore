@@ -36,3 +36,6 @@ coverage/
 
 # 自验临时产物（P5 清理临时脚本时一并移除目录）
 scripts/p4-out/
+
+# WorkBuddy 本地会话数据
+.workbuddy/
