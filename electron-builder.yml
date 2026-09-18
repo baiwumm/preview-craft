@@ -46,7 +46,7 @@ nsis:
   installerLanguages:
     - zh_CN
   language: '2052'
-  # 卸载只清程序与快捷方式，保留用户设置与自定义模板（userData 实际为 %APPDATA%/preview-craft）
-  deleteAppDataOnUninstall: false
+  # 卸载即清空：连 %APPDATA%\preview-craft 的设置与自定义模板一并删除
+  deleteAppDataOnUninstall: true
   runAfterFinish: false
   artifactName: ${productName}-Setup-${version}.${ext}

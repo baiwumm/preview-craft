@@ -197,14 +197,17 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 2026-09-19 | P5（**完成**） | **第 7 项打包与安装实测通过**：① BrowserGuideModal 目视验证 —— 临时无条件 `setGuideOpen(true)` → build → CDP 截图核验（标题 / 三条说明 / 稍后再说·指定路径·下载 Chromium 三按钮 / 暗色主题遮罩均正确）→ 还原后 `git diff` 干净；② 打包 —— `resources/icon.ico` 为 PNG-in-ICO 封装被 electron-builder 判非法（其解析器只认 BMP 帧），`win.icon` 改指 `resources/icon.png`（512×512）由构建期转 ICO，icon.ico 删除；`pnpm dist` 时 electron-builder **不读 .npmrc**，首次需显式 export `ELECTRON_MIRROR` / `ELECTRON_BUILDER_BINARIES_MIRROR`（否则 NSIS 资源下载超时 600s 失败，已写进 README）；产出 `release/PreviewCraft-Setup-2.0.0.exe`（111MB）；③ 安装实测 —— `/S` 静默安装到 `%LOCALAPPDATA%\Programs\PreviewCraft`，安装目录 / 桌面与开始菜单快捷方式 / HKCU 注册表卸载项全部就位；CDP 驱动安装版全流程：启动无崩溃（**P0 遗留的打包版 GPU/沙箱疑虑解除**）→ github.com 四端 iframe 预览 → 截图 4 张（2880/2732/1536/780 与 preset 2x 精确一致）→ 切「双屏聚焦」→ 导出（重新截图 + 合成临时文件 + 保存对话框步骤 + **剪贴板 ContainsImage=True**）；④ 卸载验证 —— `/S` 卸载后安装目录 / 快捷方式 / 注册表项全清；userData **实际为 `%APPDATA%\preview-craft`**（Electron 取 package.json name 而非 productName，已修正 yml 注释）按 `deleteAppDataOnUninstall: false` 保留，settings.json 内容原样；⑤ 保存对话框无法在本自动化环境弹出/驱动（裸 Electron 独立脚本 showSaveDialog 同样挂起 → **会话环境限制，非应用缺陷**；导出链路其余环节均已自动化验证），「对话框落盘确认」与「NSIS 中文安装界面目视」交人工，见「六、待确认」。typecheck / lint 零错误 | 剩余人工确认两项 + 卸载数据口径一项，见「六、待确认」
 | 2026-09-19 | 反馈修复（v2.1.0） | **安装实测后用户反馈 6+2 项全部修复**：① 单实例锁 `requestSingleInstanceLock`，重复启动聚焦已有窗口（实测第二实例即刻退出）；② 设备壳弃用 PNG 改**纯 CSS 绘制**（几何数据化进 `shared/devices.ts`，DeviceShell 组件渲染机身/支架/底座/刘海/摄像头，内屏内容统一进 overflow-hidden 裁剪层）——圆角精确贴合解决「笔记本/手机圆角漏底色」，2x/3x 导出锐利且不再嵌图，4 张壳图与 `@frames` 别名删除；③ 新增「透明」背景板：预览铺棋盘格，导出窗口 `transparent:true` + 页面透明，**PNG 保留 alpha**（实测 colorType 6、四角 alpha=0、设备区不透明），JPG 自动垫白（`flattenWhite` 载荷）；④ 截图/导出任务遮罩上移覆盖画布 + 右侧面板，交互全锁定，顶栏「刷新预览/截图/设置」随任务禁用；⑤ 模板画廊改单列（缩略图 0.3）；分设备 URL 区收进卡片容器；侧栏页签改分段器样式；⑥ 模板修正：经典全家福左移 35px 居中（包围盒 65~1055）、有序陈列左移 40px 手机完整入画（原溢出画布 15px）。**自验**：typecheck/lint/build 三绿；CDP 驱动 9 项断言全过（含透明 PNG alpha 逐像素解析、单实例、遮罩存在性）；JPG 环节教训：React Aria Select 需真实指针事件，`element.click()` 打不开下拉 → 换 `page.mouse.click` 坐标点击后经 UI 切格式成功导出 JPEG（magic ffd8）。版本 2.1.0，四个提交（1c109dc / b075ec5 / 54d7236 / 1dfb7ae） | 无遗留；人工确认项同上不变
 | 2026-09-19 | 样式微调（v2.1.0 续） | 用户手工调整入库（页签全默认、导出/样式面板按钮并排、说明文字改 Description，a56f96b）；渐变起止色 ColorField 增加实时 ColorSwatch 色板前缀（a2de5dc，官方 Prefix 复合写法，CDP 截图核验）；侧栏页签先加分段器后按用户要求还原默认（2702570）。**版本更新提示功能确认本期不做**，轻量 / 完整两档方案记入「七、Backlog」待后续选型。typecheck / lint / build 三绿，安装包重新产出（02:18） | —
+| 2026-09-19 | 卸载口径定夺（v2.1.1） | 用户定夺「**卸载即清空**」：`deleteAppDataOnUninstall` 改 `true`，卸载时连同 `%APPDATA%\preview-craft`（设置、自定义模板、缓存）一并删除；曾考虑卸载时弹窗由用户选择（`customUnInstall` 自定义 NSIS 宏方案，已验证模板钩子存在），按「不用搞那么复杂」取消，脚本未入库。版本升 2.1.1 并重出安装包 | 明日视情况调整；注意 2.1.1 起卸载即清数据，覆盖安装不受影响
 
 ## 六、待确认
 
-P5 已完成（2026-09-19）。原「P5 待续」各条目已随执行记录闭环，剩余三项需用户定夺：
+截至 2026-09-19 晚，历史待确认项全部闭环，无阻塞开发的事项：
 
-1. **两项目视确认**（自动化在本会话环境受阻）：① 双击 `release/PreviewCraft-Setup-2.0.0.exe` 应出现中文安装向导（language 2052），完成后桌面 / 开始菜单快捷方式带图标；② 应用内导出应弹出「另存为」对话框，确认后文件按 `<host>-<template>-<N>x.png` 落盘「下载」目录并复制到剪贴板。说明：本会话环境无法显示/驱动原生文件对话框（裸 Electron 脚本同样挂起，属环境限制），导出链路其余环节（重新截图 → 合成 → 剪贴板）已自动化验证通过。
-2. **卸载数据口径**：当前 `deleteAppDataOnUninstall: false`，卸载保留 `%APPDATA%\preview-craft` 的设置与自定义模板（已实测保留）。若要求「卸载即清空」需改为 true —— 属产品口径，未擅自定夺。
-3. **P0 遗留 GPU 疑虑已解除**：打包版默认 GPU/沙箱路径在本环境启动正常，无需产品兜底（dev 环境的 `no-sandbox`/`disable-gpu` 条件开关维持现状即可）。
+1. **卸载数据口径**：✅ 已定夺「卸载即清空」—— 2.1.1 起 `deleteAppDataOnUninstall: true`，卸载时连 `%APPDATA%\preview-craft` 一并删除；覆盖安装不受影响。
+2. **安装界面与保存对话框目视确认**：✅ 用户已实际安装并使用应用（2026-09-19 反馈即来自真实使用），视为通过。
+3. **打包版 GPU/沙箱**：✅ 已解除疑虑（安装版启动正常），dev 的条件开关维持现状。
+4. **发布事务**（git tag / GitHub Release）：用户确认推后，下次会话视情况再定。
+5. **版本更新提示**：本期不做，方案记录在「七、Backlog」，需要时再选型。
 
 ## 七、Backlog（后续迭代，均未开发）
 

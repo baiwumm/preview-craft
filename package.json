@@ -1,6 +1,6 @@
 {
   "name": "preview-craft",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "多设备截图排版工具：粘贴 URL → 多设备真实截图 → 排版模板 → 导出高清展示图",
   "main": "out/main/index.js",
   "author": "PreviewCraft",
