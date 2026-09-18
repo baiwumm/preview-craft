@@ -1,0 +1,51 @@
+# electron-builder 配置：Windows NSIS 安装包（中文安装界面）
+appId: com.previewcraft.desktop
+productName: PreviewCraft
+copyright: Copyright © 2026 PreviewCraft
+
+directories:
+  output: release
+  buildResources: resources
+
+# 仅排除非运行时内容；out/ 与生产依赖（puppeteer-core / @puppeteer/browsers）随包打入
+files:
+  - '!**/*.tsbuildinfo'
+  - '!**/*.map'
+  - '!{tsconfig,tsconfig.node,tsconfig.web}.json'
+  - '!electron.vite.config.ts'
+  - '!eslint.config.mjs'
+  - '!.npmrc'
+  - '!pnpm-lock.yaml'
+  - '!pnpm-workspace.yaml'
+  - '!src/**'
+  - '!docs/**'
+  - '!scripts/**'
+  - '!public/**'
+  - '!.agents/**'
+  - '!.workbuddy/**'
+  - '!AGENTS.md'
+  - '!README.md'
+
+# 全部依赖为纯 JS，无需二次构建（避免离线环境下触发安装）
+npmRebuild: false
+
+win:
+  target:
+    - nsis
+  icon: resources/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PreviewCraft
+  # 简体中文安装界面（LCID 2052 = zh_CN）
+  installerLanguages:
+    - zh_CN
+  language: '2052'
+  # 卸载只清程序与快捷方式，保留用户设置与自定义模板（%APPDATA%/PreviewCraft）
+  deleteAppDataOnUninstall: false
+  runAfterFinish: false
+  artifactName: ${productName}-Setup-${version}.${ext}
