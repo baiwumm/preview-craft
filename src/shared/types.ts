@@ -72,4 +72,7 @@ export interface Api {
   exportClipboard(input: { path: string }): Promise<void>;
   settingsGet(): Promise<AppSettings>;
   settingsSet(patch: Partial<AppSettings>): Promise<AppSettings>;
+  templatesGet(): Promise<Template[]>;
+  templatesSave(template: Template): Promise<Template[]>;
+  templatesDelete(id: string): Promise<Template[]>;
 }

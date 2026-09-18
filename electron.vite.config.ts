@@ -17,6 +17,8 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), tailwindcss()],
+    // 固定非常用端口，避免与本机其他 dev server 冲突
+    server: { port: 5188, strictPort: true },
     resolve: {
       alias: {
         ...sharedAlias,

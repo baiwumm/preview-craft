@@ -20,6 +20,8 @@ const innerRadius: Record<DeviceId, number> = { desktop: 24, laptop: 20, tablet:
 interface DeviceFrameProps {
   placement: Placement;
   url: string;
+  /** 是否渲染设备投影（会话样式） */
+  shadow?: boolean;
 }
 
 /**
@@ -27,7 +29,7 @@ interface DeviceFrameProps {
  * 壳图按 placement.width 显示，内屏绝对定位在 inner 区域，
  * iframe 以 viewport 实际尺寸渲染后 scale(inner/viewport) 铺入，保证永不变形。
  */
-export default function DeviceFrame({ placement, url }: DeviceFrameProps): ReactElement {
+export default function DeviceFrame({ placement, url, shadow }: DeviceFrameProps): ReactElement {
   const preset = devicePresets[placement.device];
   const { aspect, inner } = preset.frame;
 
@@ -48,7 +50,8 @@ export default function DeviceFrame({ placement, url }: DeviceFrameProps): React
         height: displayHeight,
         backgroundImage: `url(${frameImages[placement.device]})`,
         backgroundSize: '100% 100%',
-        transform: placement.rotation ? `rotate(${placement.rotation}deg)` : undefined
+        transform: placement.rotation ? `rotate(${placement.rotation}deg)` : undefined,
+        filter: shadow ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.35))' : undefined
       }}
     >
       {url ? (

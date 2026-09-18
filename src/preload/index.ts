@@ -33,7 +33,10 @@ const api: Api = {
   exportSave: (input) => ipcRenderer.invoke('export:save', input),
   exportClipboard: (input) => ipcRenderer.invoke('export:clipboard', input),
   settingsGet: () => ipcRenderer.invoke('settings:get'),
-  settingsSet: (patch) => ipcRenderer.invoke('settings:set', patch)
+  settingsSet: (patch) => ipcRenderer.invoke('settings:set', patch),
+  templatesGet: () => ipcRenderer.invoke('templates:get'),
+  templatesSave: (template) => ipcRenderer.invoke('templates:save', template),
+  templatesDelete: (id) => ipcRenderer.invoke('templates:delete', id)
 };
 
 contextBridge.exposeInMainWorld('api', api);

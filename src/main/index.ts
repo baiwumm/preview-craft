@@ -3,7 +3,13 @@ import { BrowserWindow, app, ipcMain } from 'electron';
 
 import { detectBrowsers, ensureBrowser } from './browser';
 import { captureStart, closeBrowser, runCaptureSelfTest } from './capture';
-import { getSettings, setSettings } from './store';
+import {
+  deleteCustomTemplate,
+  getCustomTemplates,
+  getSettings,
+  saveCustomTemplate,
+  setSettings
+} from './store';
 
 // 开发环境所在会话 GPU 进程不可用（GPU process isn't usable → 启动即崩），
 // 仅在未打包时禁用 GPU 与 Chromium 沙箱；打包版的 GPU/沙箱行为保持默认，待 P5 安装实测验证。
@@ -67,6 +73,12 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => getSettings());
 
   ipcMain.handle('settings:set', (_event, patch) => setSettings(patch));
+
+  ipcMain.handle('templates:get', () => getCustomTemplates());
+
+  ipcMain.handle('templates:save', (_event, template) => saveCustomTemplate(template));
+
+  ipcMain.handle('templates:delete', (_event, id) => deleteCustomTemplate(id));
 }
 
 app.whenReady().then(async () => {

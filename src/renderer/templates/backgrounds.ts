@@ -49,3 +49,14 @@ export const backgrounds: BackgroundPreset[] = [
 export function getBackground(key: string): BackgroundPreset {
   return backgrounds.find((bg) => bg.key === key) ?? backgrounds[0];
 }
+
+/**
+ * 解析背景 key 为 CSS background 值。
+ * 预设 key 直接取色板；`custom:` 前缀取其余部分为自定义 CSS（渐变）。
+ */
+export function resolveBackgroundCss(key: string): string {
+  if (key.startsWith('custom:')) {
+    return key.slice('custom:'.length) || '#ffffff';
+  }
+  return getBackground(key).value;
+}

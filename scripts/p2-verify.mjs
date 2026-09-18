@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const PORT = process.env.PC_PORT ?? '5173';
+const PORT = process.env.PC_PORT ?? '5188';
 const outDir = join(tmpdir(), 'preview-craft');
 await mkdir(outDir, { recursive: true });
 
