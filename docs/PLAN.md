@@ -199,7 +199,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 
 ### P5 待续（下次会话按此顺序推进）
 
-1. **先提交现有改动**：已完成（feat 错误边界/设置页/快捷键 → chore 图标与 NSIS 配置 + 清理自验脚本 → docs README 与进度回写）。
+1. **提交改动**：已完成（`fc16a12` feat 错误边界/设置页/快捷键 → `dcb8b46` chore 图标与 NSIS 配置 + 清理自验脚本 → `eb79715` docs README 与进度回写）。
 2. **补完 P5 自验（脚本口径三条教训，重建 harness 时直接照做）**：本次会话末已删除 `scripts/`（含 p5-verify.mjs 与全部 P0~P4 临时脚本），下次若要复跑需重建 CDP 驱动脚本 ——
    ① 一律用 `page.mainFrame().evaluate` 而不是 `page.evaluate`：预览 iframe 被站点拦截后会以 `chrome-error://chromewebdata/` 脱离，puppeteer 选中该 frame 就报 `Attempted to use detached Frame`（应用侧无缺陷，中断前一次完整跑 22/24 PASS）；
    ② 改导出格式必须走设置页 UI 下拉，脚本直写 `settingsSet` 不会同步 App 内 React state（曾导致导出产物成 .jpg）；
