@@ -196,6 +196,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 2026-09-18 | P5（**部分完成，中断待续**） | **已落地并通过自验（第 1~5 项）**：① 错误与边界 —— BrowserGuideModal（说明 + 一键下载 Chromium + 真实下载进度）、describeCaptureError 中文归因（超时/DNS/连接中断/证书/浏览器启动失败…，未归类 net::ERR_* 保留错误码）、失败设备清掉上一轮旧截图以露出画布内「重试」占位（原缺陷：过期画面遮住重试入口）、URL 校验补拒绝含空白串；② 设置页 SettingsModal（Tabs：浏览器 / 默认值 / 缓存）+ 新增 IPC `cache:stats`、`cache:clear`、`dialog:pick-browser`、`clipboard:read-text`（capture.ts 导出 shotCacheDir/cacheStats/cacheClear，export.ts 复用）；③ 快捷键 useShortcuts（Ctrl+Enter 截图 / Ctrl+S 导出 / Ctrl+V 由主进程代读剪贴板，焦点在输入区时让位原生粘贴、Ctrl+Shift+V 不拦截）+ 截图与导出拆分为 captureShots 复用 + 顶栏「截图」「设置」入口；④ 图标 resources/icon.svg/png/ico（旧 1.3.0 logo.svg 加暮色紫圆角底，本机 Chrome 光栅化 16~512px + PNG-in-ICO 打包）+ electron-builder.yml（NSIS 中文 zh_CN/LCID 2052、桌面与开始菜单快捷方式、appId com.previewcraft.desktop、productName PreviewCraft、artifactName PreviewCraft-Setup-版本.exe、npmRebuild:false）+ package.json 脚本 `dist` / `dist:dir` + main 进程 setAppUserModelId；⑤ README.md 重写完成（产品介绍/功能表/快捷键/安装/架构与 IPC 表/已知限制），两张配图见下文。**自验**：typecheck/lint 零错误、electron-vite build 通过；真实应用 CDP 驱动最近一次完整跑 **22/24 PASS**（URL 校验、Ctrl+Enter 截图 4 台、换模板、不可达站点错误 Toast「连接被中断，站点可能不可达」+ 单台重试、设置三 Tab、格式持久化、清除缓存 before=4/removed=4/after=0、Ctrl+V 归一化、浏览器路径缺失报错全绿；两条 FAIL 均为脚本口径：App 内 format 状态未随 IPC 直写同步导致导出成 .jpg、原生保存对话框 Esc 关闭后剪贴板未写入）。**第 6 项清理**：PC_CAPTURE_TEST / runCaptureSelfTest / PC_REMOTE_DEBUGGING_PORT 三个钩子已删（改用 CLI `--remote-debugging-port` 驱动，验证可行）；`scripts/` 全部临时脚本（spike-a/b、p0-shot、p2-verify、p2-debug、p3-verify、png-size、extract-docs、p4-verify、p5-verify 与产物目录）与 .gitignore 的 `scripts/p4-out/` 条目已删除。README 两张配图已落库（`docs/images/app-main.png`、`docs/images/export-sample.jpg`，后者是导出链路真实产物）。**第 7 项打包与安装实测未开始** | 见「六、待确认」P5 待续条目
 | 2026-09-19 | P5（**完成**） | **第 7 项打包与安装实测通过**：① BrowserGuideModal 目视验证 —— 临时无条件 `setGuideOpen(true)` → build → CDP 截图核验（标题 / 三条说明 / 稍后再说·指定路径·下载 Chromium 三按钮 / 暗色主题遮罩均正确）→ 还原后 `git diff` 干净；② 打包 —— `resources/icon.ico` 为 PNG-in-ICO 封装被 electron-builder 判非法（其解析器只认 BMP 帧），`win.icon` 改指 `resources/icon.png`（512×512）由构建期转 ICO，icon.ico 删除；`pnpm dist` 时 electron-builder **不读 .npmrc**，首次需显式 export `ELECTRON_MIRROR` / `ELECTRON_BUILDER_BINARIES_MIRROR`（否则 NSIS 资源下载超时 600s 失败，已写进 README）；产出 `release/PreviewCraft-Setup-2.0.0.exe`（111MB）；③ 安装实测 —— `/S` 静默安装到 `%LOCALAPPDATA%\Programs\PreviewCraft`，安装目录 / 桌面与开始菜单快捷方式 / HKCU 注册表卸载项全部就位；CDP 驱动安装版全流程：启动无崩溃（**P0 遗留的打包版 GPU/沙箱疑虑解除**）→ github.com 四端 iframe 预览 → 截图 4 张（2880/2732/1536/780 与 preset 2x 精确一致）→ 切「双屏聚焦」→ 导出（重新截图 + 合成临时文件 + 保存对话框步骤 + **剪贴板 ContainsImage=True**）；④ 卸载验证 —— `/S` 卸载后安装目录 / 快捷方式 / 注册表项全清；userData **实际为 `%APPDATA%\preview-craft`**（Electron 取 package.json name 而非 productName，已修正 yml 注释）按 `deleteAppDataOnUninstall: false` 保留，settings.json 内容原样；⑤ 保存对话框无法在本自动化环境弹出/驱动（裸 Electron 独立脚本 showSaveDialog 同样挂起 → **会话环境限制，非应用缺陷**；导出链路其余环节均已自动化验证），「对话框落盘确认」与「NSIS 中文安装界面目视」交人工，见「六、待确认」。typecheck / lint 零错误 | 剩余人工确认两项 + 卸载数据口径一项，见「六、待确认」
 | 2026-09-19 | 反馈修复（v2.1.0） | **安装实测后用户反馈 6+2 项全部修复**：① 单实例锁 `requestSingleInstanceLock`，重复启动聚焦已有窗口（实测第二实例即刻退出）；② 设备壳弃用 PNG 改**纯 CSS 绘制**（几何数据化进 `shared/devices.ts`，DeviceShell 组件渲染机身/支架/底座/刘海/摄像头，内屏内容统一进 overflow-hidden 裁剪层）——圆角精确贴合解决「笔记本/手机圆角漏底色」，2x/3x 导出锐利且不再嵌图，4 张壳图与 `@frames` 别名删除；③ 新增「透明」背景板：预览铺棋盘格，导出窗口 `transparent:true` + 页面透明，**PNG 保留 alpha**（实测 colorType 6、四角 alpha=0、设备区不透明），JPG 自动垫白（`flattenWhite` 载荷）；④ 截图/导出任务遮罩上移覆盖画布 + 右侧面板，交互全锁定，顶栏「刷新预览/截图/设置」随任务禁用；⑤ 模板画廊改单列（缩略图 0.3）；分设备 URL 区收进卡片容器；侧栏页签改分段器样式；⑥ 模板修正：经典全家福左移 35px 居中（包围盒 65~1055）、有序陈列左移 40px 手机完整入画（原溢出画布 15px）。**自验**：typecheck/lint/build 三绿；CDP 驱动 9 项断言全过（含透明 PNG alpha 逐像素解析、单实例、遮罩存在性）；JPG 环节教训：React Aria Select 需真实指针事件，`element.click()` 打不开下拉 → 换 `page.mouse.click` 坐标点击后经 UI 切格式成功导出 JPEG（magic ffd8）。版本 2.1.0，四个提交（1c109dc / b075ec5 / 54d7236 / 1dfb7ae） | 无遗留；人工确认项同上不变
+| 2026-09-19 | 样式微调（v2.1.0 续） | 用户手工调整入库（页签全默认、导出/样式面板按钮并排、说明文字改 Description，a56f96b）；渐变起止色 ColorField 增加实时 ColorSwatch 色板前缀（a2de5dc，官方 Prefix 复合写法，CDP 截图核验）；侧栏页签先加分段器后按用户要求还原默认（2702570）。**版本更新提示功能确认本期不做**，轻量 / 完整两档方案记入「七、Backlog」待后续选型。typecheck / lint / build 三绿，安装包重新产出（02:18） | —
 
 ## 六、待确认
 
@@ -205,6 +206,14 @@ P5 已完成（2026-09-19）。原「P5 待续」各条目已随执行记录闭�
 2. **卸载数据口径**：当前 `deleteAppDataOnUninstall: false`，卸载保留 `%APPDATA%\preview-craft` 的设置与自定义模板（已实测保留）。若要求「卸载即清空」需改为 true —— 属产品口径，未擅自定夺。
 3. **P0 遗留 GPU 疑虑已解除**：打包版默认 GPU/沙箱路径在本环境启动正常，无需产品兜底（dev 环境的 `no-sandbox`/`disable-gpu` 条件开关维持现状即可）。
 
-## 七、Backlog（后续迭代）
+## 七、Backlog（后续迭代，均未开发）
 
-fullPage 长截图、登录态截图（复用用户 Chrome profile）、批量 URL 队列、OG image 尺寸预设、自动更新（electron-updater + GitHub Releases）、系统托盘与全局快捷键、导出历史记录。
+- fullPage 长截图
+- 登录态截图（复用用户 Chrome profile）
+- 批量 URL 队列
+- OG image 尺寸预设
+- **版本更新提示**（2026-09-19 确认本期不做，两档方案待选）：
+  - 轻量：启动时请求 GitHub Releases（或自建版本 JSON）比对版本号，Toast/Modal 提示「前往下载」，无新依赖；
+  - 完整：electron-updater + GitHub Releases，应用内自动下载与一键安装（引入 electron-updater 依赖，发布流程固定走 GitHub Releases）。
+- 系统托盘与全局快捷键
+- 导出历史记录
