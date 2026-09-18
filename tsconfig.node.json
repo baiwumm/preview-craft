@@ -14,7 +14,10 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"]
+    }
   },
   "include": [
     "electron.vite.config.ts",

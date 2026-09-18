@@ -63,6 +63,8 @@ export interface AppSettings {
 
 export interface Api {
   browserDetect(): Promise<{ found: BrowserInfo[]; active?: BrowserInfo }>;
+  browserDownload(): Promise<{ path: string }>;
+  onBrowserDownloadProgress(listener: (progress: { percent: number }) => void): () => void;
   captureStart(input: CaptureStartInput): Promise<CaptureResult>;
   onCaptureProgress(listener: (progress: CaptureProgress) => void): () => void;
   exportCompose(input: ExportComposeInput): Promise<{ path: string }>;
