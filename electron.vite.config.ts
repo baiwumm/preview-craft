@@ -21,6 +21,7 @@ export default defineConfig({
       alias: {
         ...sharedAlias,
         '@': resolve(__dirname, 'src/renderer/src'),
+        '@templates': resolve(__dirname, 'src/renderer/templates'),
         '@frames': resolve(__dirname, 'resources/frames')
       }
     }

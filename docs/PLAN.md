@@ -176,8 +176,8 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 ## 四、进度追踪
 
 - [x] P0 骨架与风险验证
-- [ ] P1 截图引擎
-- [ ] P2 前端主体
+- [x] P1 截图引擎
+- [x] P2 前端主体
 - [ ] P3 模板系统
 - [ ] P4 导出闭环
 - [ ] P5 打磨与分发
@@ -188,8 +188,9 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | --- | --- | --- | --- |
 | 2026-09-17 | 前置 | 旧代码清理完成（保留 .git/LICENSE）；Skill 与本计划落库；`desktop/` 目录被进程占用仅剩空壳，内容已清空 | 关闭占用进程后手动删除空目录 |
 | 2026-09-18 | 基线 | 提交 be7ac7c：清理旧 Web 版 + AGENTS/PLAN/Skill 落库 | — |
-| 2026-09-18 | P1 | 完成。browser.ts（常见路径枚举优先 + 注册表兜底 + Chromium 下载到 userData/chromium）与 capture.ts（2x 视口/UA/isMobile/hasTouch、字体→iframe+2s→图片→冻结动画→双 rAF 完整等待策略、4 设备并行、allSettled 语义、temp 落盘、浏览器实例复用）+ IPC/preload 全契约实现 + electron-store 设置持久化。自验：github.com 与 bilibili.com 均 4 设备出图，desktop 2880×1900 / mobile 780×1680 与 preset 精确一致，capture:progress 事件顺序正确 | ① 会话安全策略拉黑 reg.exe → 检测顺序调整为常见路径优先、注册表仅在路径枚举有遗漏 kind 时兜底（功能不缺失）；② @puppeteer/browsers v3 install 已移除 progressCallback → 下载进度事件仅上报起止（0%/100%），P5 引导 UI 需知悉；③ 自验钩子 PC_CAPTURE_TEST 环境变量与 scripts/ 临时脚本（spike-a/b、p0-shot、png-size）留待 P5 清理 |
 | 2026-09-18 | P0 | 完成。骨架可运行（Electron 44 / electron-vite 5 / vite 8 / React 19 / HeroUI 3.2 / Tailwind 4.3 / TS 6.0），HeroUI 按钮 + 暗色主题 + 壳图显示已验证（截图核验）；**Spike A**：show:false 的 capturePage 产出 92,696 字节真实渐变 PNG → **P4 采用 show:false 方案**（offscreen:true 模式 74,526 字节可用作备选；「屏幕外坐标 + show:true」失败报 Current display surface not available，弃用）；**Spike B**：puppeteer-core 控本机 Chrome headless 截 example.com 产出 39,910 字节 2x PNG → 截图引擎路线可行；typecheck/lint 零错误 | ① 本会话环境 GPU 进程不可用，dev 启动即崩 → main 已按 `!app.isPackaged` 条件加 `no-sandbox`/`disable-gpu` 开关，打包版默认路径待 P5 实测；② pnpm 信任策略拦截 semver@6.3.1/5.7.2 → pnpm-workspace.yaml `trustPolicyExclude`；electron/esbuild 构建脚本经 `allowBuilds` 放行；③ TypeScript 锁 6.0.3（typescript-eslint 8.70 不支持 TS7）；④ 壳图恢复命令的 tag 实为 `1.3.0`（无 v 前缀），本计划中 `v1.3.0` 写法需留意；⑤ 内屏偏移取自旧版 enums（desktop 11/11、laptop 56/10、tablet 10/12、mobile 7/6），已固化进 devices.ts |
+| 2026-09-18 | P1 | 完成。browser.ts（常见路径枚举优先 + 注册表兜底 + Chromium 下载到 userData/chromium）与 capture.ts（2x 视口/UA/isMobile/hasTouch、字体→iframe+2s→图片→冻结动画→双 rAF 完整等待策略、4 设备并行、allSettled 语义、temp 落盘、浏览器实例复用）+ IPC/preload 全契约实现 + electron-store 设置持久化。自验：github.com 与 bilibili.com 均 4 设备出图，desktop 2880×1900 / mobile 780×1680 与 preset 精确一致，capture:progress 事件顺序正确 | ① 会话安全策略拉黑 reg.exe → 检测顺序调整为常见路径优先、注册表仅在路径枚举有遗漏 kind 时兜底（功能不缺失）；② @puppeteer/browsers v3 install 已移除 progressCallback → 下载进度事件仅上报起止（0%/100%），P5 引导 UI 需知悉；③ 自验钩子 PC_CAPTURE_TEST 环境变量与 scripts/ 临时脚本（spike-a/b、p0-shot、png-size）留待 P5 清理 |
+| 2026-09-18 | P2 | 完成。三栏布局（顶栏 URL 区 / 中央画布 / 右侧留位）；UrlBar（回车刷新 + 分设备 URL Accordion + normalizeUrl 校验）；DeviceFrame（壳图 + inner 绝对定位 + viewport 缩放，几何全部由 devices.ts 驱动）；Canvas（classic 模板 + 背景板 + ResizeObserver 自适应缩放）；明暗主题（.dark + data-theme，持久化 electron-store）；React 内置状态管理。应用底色按用户要求统一为 bg-background text-foreground。自验（无头 Chrome 交互驱动）：主 URL 回车 → 4 设备 iframe 实时加载；主题切换即时生效；分设备 URL 仅该设备变化 | ① github.com 等带 X-Frame-Options/CSP frame-ancestors 的站点无法进预览 iframe（ERR_BLOCKED_BY_RESPONSE），属站点限制——P4 导出走真实截图不受影响，预览态此限制接受；② vite 长驻 dev server 的 HMR 对外部编辑器改动可能失效（本次排查中踩到 stale module），验证前需重启 dev；③ 主题持久化依赖 preload 桥，浏览器直开页面时安全降级（window.api? 可选链） |
 
 ## 六、待确认
 
