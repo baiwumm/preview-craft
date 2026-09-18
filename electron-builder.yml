@@ -32,7 +32,8 @@ npmRebuild: false
 win:
   target:
     - nsis
-  icon: resources/icon.ico
+  # 512px PNG 由 electron-builder 构建期转为 ICO（icon.ico 为 PNG-in-ICO 封装，其解析器不支持）
+  icon: resources/icon.png
 
 nsis:
   oneClick: false
@@ -45,7 +46,7 @@ nsis:
   installerLanguages:
     - zh_CN
   language: '2052'
-  # 卸载只清程序与快捷方式，保留用户设置与自定义模板（%APPDATA%/PreviewCraft）
+  # 卸载只清程序与快捷方式，保留用户设置与自定义模板（userData 实际为 %APPDATA%/preview-craft）
   deleteAppDataOnUninstall: false
   runAfterFinish: false
   artifactName: ${productName}-Setup-${version}.${ext}

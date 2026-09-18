@@ -63,9 +63,12 @@ pnpm dev            # electron-vite 三层热更新，renderer 固定端口 5188
 pnpm typecheck      # tsc --noEmit（node + web 两套 tsconfig）
 pnpm lint           # eslint
 pnpm build          # 编译到 out/
-pnpm dist           # 打包 NSIS 安装包到 release/
+pnpm dist           # 打包 NSIS 安装包到 release/（首次运行见下方镜像说明）
 pnpm dist:dir       # 只出免安装目录 release/win-unpacked/，用于快速冒烟
 ```
+
+> 打包注意：electron-builder 不读取 `.npmrc`。首次执行 `pnpm dist` 前需显式设置镜像环境变量，否则 NSIS 资源下载会超时：
+> `export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/`（PowerShell 用 `$env:` 逐个设置）。资源有缓存后无需重复设置。
 
 ### 目录结构
 
