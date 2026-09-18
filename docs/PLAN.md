@@ -180,7 +180,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 - [x] P2 前端主体
 - [x] P3 模板系统
 - [x] P4 导出闭环
-- [ ] P5 打磨与分发
+- [ ] P5 打磨与分发（**进行中**：1~5 项代码已落地并自验通过，第 6 项清理未做完，第 7 项打包/安装实测未开始 —— 详见执行记录 2026-09-18 P5）
 
 ## 五、执行记录
 
@@ -193,10 +193,21 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 2026-09-18 | P2 | 完成。三栏布局（顶栏 URL 区 / 中央画布 / 右侧留位）；UrlBar（回车刷新 + 分设备 URL Accordion + normalizeUrl 校验）；DeviceFrame（壳图 + inner 绝对定位 + viewport 缩放，几何全部由 devices.ts 驱动）；Canvas（classic 模板 + 背景板 + ResizeObserver 自适应缩放）；明暗主题（.dark + data-theme，持久化 electron-store）；React 内置状态管理。应用底色按用户要求统一为 bg-background text-foreground。自验（无头 Chrome 交互驱动）：主 URL 回车 → 4 设备 iframe 实时加载；主题切换即时生效；分设备 URL 仅该设备变化 | ① github.com 等带 X-Frame-Options/CSP frame-ancestors 的站点无法进预览 iframe（ERR_BLOCKED_BY_RESPONSE），属站点限制——P4 导出走真实截图不受影响，预览态此限制接受；② vite 长驻 dev server 的 HMR 对外部编辑器改动可能失效（本次排查中踩到 stale module），验证前需重启 dev；③ 主题持久化依赖 preload 桥，浏览器直开页面时安全降级（window.api? 可选链） |
 | 2026-09-18 | P3 | 完成。TemplateGallery（预设 5 + 自定义，ThumbCanvas 按 0.22 静态渲染占位色块，选中态 ring）；StylePanel（背景板色板 + ColorField 自定义渐变 custom: 前缀存入 template.background、圆角/整体缩放 Slider、阴影 Switch、每设备 X/Y/宽/旋转 Slider）；自定义模板 electron-store `templates:v1` CRUD（templates:save/get/delete IPC）；另存为模板 Modal；微调仅会话生效 + 还原预设按钮；dev server 固定端口 5188（strictPort，用户要求避开 5173）。自验（无头 Chrome 交互驱动）：5 预设缩略图渲染；切换「灵感错落」rotation 正确渲染；Slider 键盘微调圆角 0→5px 实时生效；另存模板后画廊出现自定义项；删除后消失 | ① HeroUI Card/ToggleButtonGroup 的 pressable API 未查证，画廊项与设备 chips 用手写 div（符合「HeroUI 没有才手写」的边界判断，视觉语言一致）；② 圆角/阴影/缩放为会话样式，不随模板持久化（PLAN 3.4 的执行口径） |
 | 2026-09-18 | P4 | 完成。export.ts（隐藏 BrowserWindow + offscreen 渲染 + CDP `Emulation.setVisibleSize` 扩视口 → capturePage 全帧 → PNG/JPG/WebP，WebP 走导出窗口 OffscreenCanvas）+ export:compose/save/clipboard IPC + preload 4 个导出通道 + ExportPage（hash 路由 #/export，载荷渲染→图片解码完成→export:ready）+ ExportPanel（格式/倍率 Select + 进度）+ App.tsx 编排（截图→合成→保存对话框→剪贴板→Toast，单设备重试）。自验（真实应用 CDP 驱动 16/16 PASS）：GitHub 与 bilibili 各 4 台截图成功；2x PNG/JPG/WebP 均为 2240×1740、3x PNG 3360×2610（尺寸/魔数断言通过，3x 1.2MB 合理）；剪贴板 ContainsImage=True；UI 点击导出→进度条→temp 产物全链路通过；typecheck/lint/build 三绿。关键修复：① 导出窗口补挂 preload（缺失会导致 export:ready 永不回传）；② Electron 44 移除 clipboard.writeImage → ClipboardItem W3C API；③ 隐藏窗口被 OS 钳制在工作区（2x/3x 被裁成 1920×1032）→ 窗口按 1x 创建 + setVisibleSize 扩布局视口解决；④ capturePage 偶发 UnknownVizError → 3 次重试自愈 | ① 保存对话框为原生 UI 未自动化，安装实测时人工确认；② 验证依赖 PC_REMOTE_DEBUGGING_PORT 环境变量钩子（P5 随 PC_CAPTURE_TEST 一并移除）；③ scripts/ 临时脚本（含 p4-verify.mjs 与 P0~P3 旧脚本）待 P5 清理；④ P3 追踪项勾选补记于本提交 |
+| 2026-09-18 | P5（**部分完成，中断待续**） | **已落地并通过自验（第 1~5 项）**：① 错误与边界 —— BrowserGuideModal（说明 + 一键下载 Chromium + 真实下载进度）、describeCaptureError 中文归因（超时/DNS/连接中断/证书/浏览器启动失败…，未归类 net::ERR_* 保留错误码）、失败设备清掉上一轮旧截图以露出画布内「重试」占位（原缺陷：过期画面遮住重试入口）、URL 校验补拒绝含空白串；② 设置页 SettingsModal（Tabs：浏览器 / 默认值 / 缓存）+ 新增 IPC `cache:stats`、`cache:clear`、`dialog:pick-browser`、`clipboard:read-text`（capture.ts 导出 shotCacheDir/cacheStats/cacheClear，export.ts 复用）；③ 快捷键 useShortcuts（Ctrl+Enter 截图 / Ctrl+S 导出 / Ctrl+V 由主进程代读剪贴板，焦点在输入区时让位原生粘贴、Ctrl+Shift+V 不拦截）+ 截图与导出拆分为 captureShots 复用 + 顶栏「截图」「设置」入口；④ 图标 resources/icon.svg/png/ico（旧 1.3.0 logo.svg 加暮色紫圆角底，本机 Chrome 光栅化 16~512px + PNG-in-ICO 打包）+ electron-builder.yml（NSIS 中文 zh_CN/LCID 2052、桌面与开始菜单快捷方式、appId com.previewcraft.desktop、productName PreviewCraft、artifactName PreviewCraft-Setup-版本.exe、npmRebuild:false）+ package.json 脚本 `dist` / `dist:dir` + main 进程 setAppUserModelId；⑤ README.md 重写完成（产品介绍/功能表/快捷键/安装/架构与 IPC 表/已知限制），两张配图见下文。**自验**：typecheck/lint 零错误、electron-vite build 通过；真实应用 CDP 驱动最近一次完整跑 **22/24 PASS**（URL 校验、Ctrl+Enter 截图 4 台、换模板、不可达站点错误 Toast「连接被中断，站点可能不可达」+ 单台重试、设置三 Tab、格式持久化、清除缓存 before=4/removed=4/after=0、Ctrl+V 归一化、浏览器路径缺失报错全绿；两条 FAIL 均为脚本口径：App 内 format 状态未随 IPC 直写同步导致导出成 .jpg、原生保存对话框 Esc 关闭后剪贴板未写入）。**第 6 项清理**：PC_CAPTURE_TEST / runCaptureSelfTest / PC_REMOTE_DEBUGGING_PORT 三个钩子已删（改用 CLI `--remote-debugging-port` 驱动，验证可行）；`scripts/` 全部临时脚本（spike-a/b、p0-shot、p2-verify、p2-debug、p3-verify、png-size、extract-docs、p4-verify、p5-verify 与产物目录）与 .gitignore 的 `scripts/p4-out/` 条目已删除。README 两张配图已落库（`docs/images/app-main.png`、`docs/images/export-sample.jpg`，后者是导出链路真实产物）。**第 7 项打包与安装实测未开始** | 见「六、待确认」P5 待续条目
 
 ## 六、待确认
 
-（暂无）
+### P5 待续（下次会话按此顺序推进）
+
+1. **先提交现有改动**：已完成（feat 错误边界/设置页/快捷键 → chore 图标与 NSIS 配置 + 清理自验脚本 → docs README 与进度回写）。
+2. **补完 P5 自验（脚本口径三条教训，重建 harness 时直接照做）**：本次会话末已删除 `scripts/`（含 p5-verify.mjs 与全部 P0~P4 临时脚本），下次若要复跑需重建 CDP 驱动脚本 ——
+   ① 一律用 `page.mainFrame().evaluate` 而不是 `page.evaluate`：预览 iframe 被站点拦截后会以 `chrome-error://chromewebdata/` 脱离，puppeteer 选中该 frame 就报 `Attempted to use detached Frame`（应用侧无缺陷，中断前一次完整跑 22/24 PASS）；
+   ② 改导出格式必须走设置页 UI 下拉，脚本直写 `settingsSet` 不会同步 App 内 React state（曾导致导出产物成 .jpg）；
+   ③ 原生保存对话框用 `WScript.Shell.AppActivate('另存为') + SendKeys('{ENTER}')` 确认保存到「下载」目录，断言 `github.com-classic-2x.png` 落盘后再删除该测试产物（Esc 取消则剪贴板不写入，因为 `exportClipboard` 在对话框返回之后）。
+3. **BrowserGuideModal 目视验证**：本机装有 Chrome/Edge，正常启动不会弹引导。做法是临时把 App.tsx 启动判定 `if (!hasBrowser) setGuideOpen(true)` 改成 `setGuideOpen(true)` → `pnpm build` → 截图核验 → **改回并核对 `git diff` 干净**（不留调试钩子）。Chromium 下载进度已按真实回调实现（`@puppeteer/browsers@3.2.2` 的 `InstallOptions.downloadProgressCallback` 是公开 API，**P1 记录里「v3 已移除 progressCallback」的结论是错的**），如需实测可另写 node 侧探针把 cacheDir 指到临时目录后删除。
+4. **第 7 项打包与安装实测（未开始）**：`pnpm dist`（.npmrc 的 `ELECTRON_MIRROR` / `ELECTRON_BUILDER_BINARIES_MIRROR` 经 `npm_config_*` 环境变量被 electron-builder 识别，首次需下载 nsis/winCodeSign；electron zip 已在 `%LOCALAPPDATA%\electron\Cache`）→ 确认 `release/PreviewCraft-Setup-2.0.0.exe` → `Start-Process -Wait` 静默 `/S` 安装到 `%LOCALAPPDATA%\Programs\PreviewCraft` → 跑全流程（安装版 exe 同样支持 `--remote-debugging-port=9333` CLI 开关，无需应用内钩子）→ 卸载 `/S` 后核对安装目录、桌面/开始菜单快捷方式、注册表卸载项均清除。
+5. **需人工确认的两点**（自动化受阻时交回给用户）：① **打包版 GPU/沙箱默认路径**（P0 遗留：本会话环境 GPU 不可用，dev 才加 `disable-gpu`；若安装版在本环境启动即崩，属环境限制还是需产品兜底需用户定夺）；② **NSIS 中文安装界面与桌面快捷方式**目视确认（静默安装不弹界面）。
+6. **卸载保留用户数据**：当前 `deleteAppDataOnUninstall: false`（保留 `%APPDATA%\PreviewCraft` 的设置与自定义模板）。若要求「卸载即清空」需改成 true —— 属产品口径，未擅自定夺。
 
 ## 七、Backlog（后续迭代）
 
