@@ -1,7 +1,7 @@
 import type { DeviceId, Template } from '@shared/types';
 import type { ReactElement } from 'react';
 
-import { getBackground, resolveBackgroundCss } from '@templates/backgrounds';
+import { resolveBackgroundCss } from '@templates/backgrounds';
 
 import DeviceFrame from './DeviceFrame';
 
@@ -13,21 +13,43 @@ interface CanvasProps {
   mainUrl: string;
   deviceUrls: Partial<Record<DeviceId, string>>;
   style: StyleState;
+  /** 固定缩放（导出态用 scale，跳过自适应） */
+  fixedScale?: number;
+  /** 已截取画面（dataURL，键为设备） */
+  shots?: Partial<Record<DeviceId, string>>;
+  /** 截图失败标记 */
+  shotErrors?: Partial<Record<DeviceId, string | boolean>>;
+  /** 单台重试 */
+  onRetry?: (device: DeviceId) => void;
 }
 
-/** 中央画布：按模板 placements 绝对定位摆放设备壳，画布外铺背景板 */
-export default function Canvas({ template, mainUrl, deviceUrls, style }: CanvasProps): ReactElement {
+/**
+ * 中央画布：背景板铺底（board 层），设备 placements 在内容层按 zoom 缩放，
+ * 预览态 iframe / 导出态真实截图所见即所得。
+ */
+export default function Canvas({
+  template,
+  mainUrl,
+  deviceUrls,
+  style,
+  fixedScale,
+  shots,
+  shotErrors,
+  onRetry
+}: CanvasProps): ReactElement {
   const { borderRadius, shadow, zoom } = style;
   const { ref, scale } = useFitScale(template.canvas.width, template.canvas.height);
-  const totalScale = scale * zoom;
+  const fit = fixedScale ?? scale;
+  const total = fit * zoom;
 
   return (
     <div ref={ref} className="flex h-full w-full items-center justify-center overflow-hidden">
       <div
-        className="overflow-hidden"
+        className="relative overflow-hidden"
         style={{
-          width: template.canvas.width * totalScale,
-          height: template.canvas.height * totalScale,
+          width: template.canvas.width * fit,
+          height: template.canvas.height * fit,
+          background: resolveBackgroundCss(template.background),
           borderRadius
         }}
       >
@@ -36,8 +58,7 @@ export default function Canvas({ template, mainUrl, deviceUrls, style }: CanvasP
           style={{
             width: template.canvas.width,
             height: template.canvas.height,
-            background: resolveBackgroundCss(template.background),
-            transform: `scale(${totalScale})`
+            transform: `scale(${total})`
           }}
         >
           {template.placements.map((placement) => (
@@ -46,6 +67,9 @@ export default function Canvas({ template, mainUrl, deviceUrls, style }: CanvasP
               placement={placement}
               url={deviceUrls[placement.device] || mainUrl}
               shadow={shadow}
+              shot={shots?.[placement.device]}
+              shotError={Boolean(shotErrors?.[placement.device])}
+              onRetry={onRetry ? () => onRetry(placement.device) : undefined}
             />
           ))}
         </div>
@@ -53,5 +77,3 @@ export default function Canvas({ template, mainUrl, deviceUrls, style }: CanvasP
     </div>
   );
 }
-
-export { getBackground };

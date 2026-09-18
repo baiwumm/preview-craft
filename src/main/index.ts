@@ -1,8 +1,10 @@
-import { join } from 'node:path';
-import { BrowserWindow, app, ipcMain } from 'electron';
+import { basename, join } from 'node:path';
+import { copyFile, readFile } from 'node:fs/promises';
+import { ClipboardItem, clipboard, dialog, BrowserWindow, app, ipcMain } from 'electron';
 
 import { detectBrowsers, ensureBrowser } from './browser';
 import { captureStart, closeBrowser, runCaptureSelfTest } from './capture';
+import { exportCompose, shotToDataUrl } from './export';
 import {
   deleteCustomTemplate,
   getCustomTemplates,
@@ -16,6 +18,10 @@ import {
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-gpu');
+}
+// 自验钩子（P5 随 PC_CAPTURE_TEST 一并移除）：环境变量传入端口，供 p4-verify.mjs CDP 驱动
+if (process.env.PC_REMOTE_DEBUGGING_PORT) {
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.PC_REMOTE_DEBUGGING_PORT);
 }
 
 function createWindow(): void {
@@ -79,6 +85,28 @@ function registerIpc(): void {
   ipcMain.handle('templates:save', (_event, template) => saveCustomTemplate(template));
 
   ipcMain.handle('templates:delete', (_event, id) => deleteCustomTemplate(id));
+
+  ipcMain.handle('shot:dataurl', (_event, path: string) => shotToDataUrl(path));
+
+  ipcMain.handle('export:compose', (_event, input) => exportCompose(input));
+
+  ipcMain.handle('export:save', async (_event, input: { path: string; defaultName?: string }) => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath: join(app.getPath('downloads'), input.defaultName ?? basename(input.path))
+    });
+    if (result.canceled || !result.filePath) {
+      return { saved: false };
+    }
+    await copyFile(input.path, result.filePath);
+    return { saved: true };
+  });
+
+  // Electron 44：clipboard.writeImage 已移除，走 W3C ClipboardItem（PNG → 系统位图）
+  ipcMain.handle('export:clipboard', async (_event, input: { path: string }) => {
+    const buffer = await readFile(input.path);
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([buffer], { type: 'image/png' }) })]);
+  });
 }
 
 app.whenReady().then(async () => {

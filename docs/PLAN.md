@@ -178,8 +178,8 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 - [x] P0 骨架与风险验证
 - [x] P1 截图引擎
 - [x] P2 前端主体
-- [ ] P3 模板系统
-- [ ] P4 导出闭环
+- [x] P3 模板系统
+- [x] P4 导出闭环
 - [ ] P5 打磨与分发
 
 ## 五、执行记录
@@ -192,6 +192,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 2026-09-18 | P1 | 完成。browser.ts（常见路径枚举优先 + 注册表兜底 + Chromium 下载到 userData/chromium）与 capture.ts（2x 视口/UA/isMobile/hasTouch、字体→iframe+2s→图片→冻结动画→双 rAF 完整等待策略、4 设备并行、allSettled 语义、temp 落盘、浏览器实例复用）+ IPC/preload 全契约实现 + electron-store 设置持久化。自验：github.com 与 bilibili.com 均 4 设备出图，desktop 2880×1900 / mobile 780×1680 与 preset 精确一致，capture:progress 事件顺序正确 | ① 会话安全策略拉黑 reg.exe → 检测顺序调整为常见路径优先、注册表仅在路径枚举有遗漏 kind 时兜底（功能不缺失）；② @puppeteer/browsers v3 install 已移除 progressCallback → 下载进度事件仅上报起止（0%/100%），P5 引导 UI 需知悉；③ 自验钩子 PC_CAPTURE_TEST 环境变量与 scripts/ 临时脚本（spike-a/b、p0-shot、png-size）留待 P5 清理 |
 | 2026-09-18 | P2 | 完成。三栏布局（顶栏 URL 区 / 中央画布 / 右侧留位）；UrlBar（回车刷新 + 分设备 URL Accordion + normalizeUrl 校验）；DeviceFrame（壳图 + inner 绝对定位 + viewport 缩放，几何全部由 devices.ts 驱动）；Canvas（classic 模板 + 背景板 + ResizeObserver 自适应缩放）；明暗主题（.dark + data-theme，持久化 electron-store）；React 内置状态管理。应用底色按用户要求统一为 bg-background text-foreground。自验（无头 Chrome 交互驱动）：主 URL 回车 → 4 设备 iframe 实时加载；主题切换即时生效；分设备 URL 仅该设备变化 | ① github.com 等带 X-Frame-Options/CSP frame-ancestors 的站点无法进预览 iframe（ERR_BLOCKED_BY_RESPONSE），属站点限制——P4 导出走真实截图不受影响，预览态此限制接受；② vite 长驻 dev server 的 HMR 对外部编辑器改动可能失效（本次排查中踩到 stale module），验证前需重启 dev；③ 主题持久化依赖 preload 桥，浏览器直开页面时安全降级（window.api? 可选链） |
 | 2026-09-18 | P3 | 完成。TemplateGallery（预设 5 + 自定义，ThumbCanvas 按 0.22 静态渲染占位色块，选中态 ring）；StylePanel（背景板色板 + ColorField 自定义渐变 custom: 前缀存入 template.background、圆角/整体缩放 Slider、阴影 Switch、每设备 X/Y/宽/旋转 Slider）；自定义模板 electron-store `templates:v1` CRUD（templates:save/get/delete IPC）；另存为模板 Modal；微调仅会话生效 + 还原预设按钮；dev server 固定端口 5188（strictPort，用户要求避开 5173）。自验（无头 Chrome 交互驱动）：5 预设缩略图渲染；切换「灵感错落」rotation 正确渲染；Slider 键盘微调圆角 0→5px 实时生效；另存模板后画廊出现自定义项；删除后消失 | ① HeroUI Card/ToggleButtonGroup 的 pressable API 未查证，画廊项与设备 chips 用手写 div（符合「HeroUI 没有才手写」的边界判断，视觉语言一致）；② 圆角/阴影/缩放为会话样式，不随模板持久化（PLAN 3.4 的执行口径） |
+| 2026-09-18 | P4 | 完成。export.ts（隐藏 BrowserWindow + offscreen 渲染 + CDP `Emulation.setVisibleSize` 扩视口 → capturePage 全帧 → PNG/JPG/WebP，WebP 走导出窗口 OffscreenCanvas）+ export:compose/save/clipboard IPC + preload 4 个导出通道 + ExportPage（hash 路由 #/export，载荷渲染→图片解码完成→export:ready）+ ExportPanel（格式/倍率 Select + 进度）+ App.tsx 编排（截图→合成→保存对话框→剪贴板→Toast，单设备重试）。自验（真实应用 CDP 驱动 16/16 PASS）：GitHub 与 bilibili 各 4 台截图成功；2x PNG/JPG/WebP 均为 2240×1740、3x PNG 3360×2610（尺寸/魔数断言通过，3x 1.2MB 合理）；剪贴板 ContainsImage=True；UI 点击导出→进度条→temp 产物全链路通过；typecheck/lint/build 三绿。关键修复：① 导出窗口补挂 preload（缺失会导致 export:ready 永不回传）；② Electron 44 移除 clipboard.writeImage → ClipboardItem W3C API；③ 隐藏窗口被 OS 钳制在工作区（2x/3x 被裁成 1920×1032）→ 窗口按 1x 创建 + setVisibleSize 扩布局视口解决；④ capturePage 偶发 UnknownVizError → 3 次重试自愈 | ① 保存对话框为原生 UI 未自动化，安装实测时人工确认；② 验证依赖 PC_REMOTE_DEBUGGING_PORT 环境变量钩子（P5 随 PC_CAPTURE_TEST 一并移除）；③ scripts/ 临时脚本（含 p4-verify.mjs 与 P0~P3 旧脚本）待 P5 清理；④ P3 追踪项勾选补记于本提交 |
 
 ## 六、待确认
 

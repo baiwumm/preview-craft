@@ -44,12 +44,27 @@ export interface Template {
 
 export type ExportFormat = 'png' | 'jpg' | 'webp';
 
+export interface ExportStyle {
+  borderRadius: number;
+  shadow: boolean;
+  zoom: number;
+}
+
 export interface ExportComposeInput {
   template: Template;
   shots: Record<DeviceId, string>;
   scale: 1 | 2 | 3;
   format: ExportFormat;
   quality?: number;
+  style?: ExportStyle;
+}
+
+/** 导出隐藏窗口渲染载荷（export:render 事件） */
+export interface ExportRenderPayload {
+  template: Template;
+  scale: 1 | 2 | 3;
+  shots: Record<DeviceId, string>;
+  style: ExportStyle;
 }
 
 export interface AppSettings {
@@ -68,10 +83,17 @@ export interface Api {
   captureStart(input: CaptureStartInput): Promise<CaptureResult>;
   onCaptureProgress(listener: (progress: CaptureProgress) => void): () => void;
   exportCompose(input: ExportComposeInput): Promise<{ path: string }>;
-  exportSave(input: { path: string }): Promise<{ saved: boolean }>;
+  exportSave(input: { path: string; defaultName?: string }): Promise<{ saved: boolean }>;
   exportClipboard(input: { path: string }): Promise<void>;
+  /** 导出隐藏窗口专用：接收渲染载荷 / 通知就绪 / 回传 WebP 编码结果 */
+  onExportRender(listener: (payload: ExportRenderPayload) => void): () => void;
+  onWebpConvert(listener: (payload: { dataUrl: string; quality: number }) => void): () => void;
+  exportReady(): void;
+  exportWebpResult(data: ArrayBuffer): void;
   settingsGet(): Promise<AppSettings>;
   settingsSet(patch: Partial<AppSettings>): Promise<AppSettings>;
+  /** 读取截图文件转 dataURL（预览态 Canvas 显示用） */
+  shotDataUrl(path: string): Promise<string>;
   templatesGet(): Promise<Template[]>;
   templatesSave(template: Template): Promise<Template[]>;
   templatesDelete(id: string): Promise<Template[]>;

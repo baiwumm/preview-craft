@@ -2,6 +2,8 @@ import { devicePresets } from '@shared/devices';
 import type { DeviceId, Placement } from '@shared/types';
 import type { ReactElement } from 'react';
 
+import { Button } from '@heroui/react';
+
 import desktopFrame from '@frames/desktop.png';
 import laptopFrame from '@frames/laptop.png';
 import mobileFrame from '@frames/mobile.png';
@@ -22,14 +24,27 @@ interface DeviceFrameProps {
   url: string;
   /** 是否渲染设备投影（会话样式） */
   shadow?: boolean;
+  /** 已截取的设备画面（dataURL），存在时替代 iframe 预览（导出态） */
+  shot?: string;
+  /** 该设备截图失败标记 */
+  shotError?: boolean;
+  /** 单台重试回调 */
+  onRetry?: () => void;
 }
 
 /**
- * 设备壳 + 内屏预览。
+ * 设备壳 + 内屏显示。
  * 壳图按 placement.width 显示，内屏绝对定位在 inner 区域，
- * iframe 以 viewport 实际尺寸渲染后 scale(inner/viewport) 铺入，保证永不变形。
+ * iframe/截图以 viewport 或 inner 实际尺寸铺入，保证永不变形。
  */
-export default function DeviceFrame({ placement, url, shadow }: DeviceFrameProps): ReactElement {
+export default function DeviceFrame({
+  placement,
+  url,
+  shadow,
+  shot,
+  shotError,
+  onRetry
+}: DeviceFrameProps): ReactElement {
   const preset = devicePresets[placement.device];
   const { aspect, inner } = preset.frame;
 
@@ -39,6 +54,14 @@ export default function DeviceFrame({ placement, url, shadow }: DeviceFrameProps
   const k = displayWidth / preset.frame.width;
   // iframe 内容缩放：内屏显示宽 / viewport 宽
   const scale = (inner.width * k) / preset.viewport.width;
+
+  const innerStyle = {
+    left: inner.x * k,
+    top: inner.y * k,
+    width: inner.width * k,
+    height: inner.height * k,
+    borderRadius: innerRadius[placement.device] * k
+  } as const;
 
   return (
     <div
@@ -54,7 +77,27 @@ export default function DeviceFrame({ placement, url, shadow }: DeviceFrameProps
         filter: shadow ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.35))' : undefined
       }}
     >
-      {url ? (
+      {shot ? (
+        <img
+          src={shot}
+          alt={`${preset.label}截图`}
+          className="absolute object-cover"
+          style={innerStyle}
+          draggable={false}
+        />
+      ) : shotError ? (
+        <div
+          className="absolute flex flex-col items-center justify-center gap-2 bg-danger/15"
+          style={innerStyle}
+        >
+          <span className="text-danger text-xs">截图失败</span>
+          {onRetry ? (
+            <Button size="sm" variant="primary" onPress={onRetry}>
+              重试
+            </Button>
+          ) : null}
+        </div>
+      ) : url ? (
         <iframe
           src={url}
           title={`${preset.label}预览`}
@@ -62,13 +105,11 @@ export default function DeviceFrame({ placement, url, shadow }: DeviceFrameProps
           loading="lazy"
           className="absolute overflow-hidden border-0 bg-white"
           style={{
-            left: inner.x * k,
-            top: inner.y * k,
+            ...innerStyle,
             width: preset.viewport.width,
             height: preset.viewport.height,
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
-            borderRadius: innerRadius[placement.device] * k,
             pointerEvents: 'none'
           }}
         />
