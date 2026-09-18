@@ -33,3 +33,6 @@ Thumbs.db
 
 # 测试
 coverage/
+
+# 自验临时产物（P5 清理临时脚本时一并移除目录）
+scripts/p4-out/
