@@ -11,10 +11,10 @@ export const presets: Template[] = [
     canvas: { ...CANVAS_BASE },
     background: 'twilight',
     placements: [
-      { device: 'desktop', x: 320, y: 140, width: 620 },
-      { device: 'laptop', x: 100, y: 420, width: 510 },
-      { device: 'tablet', x: 850, y: 290, width: 240 },
-      { device: 'mobile', x: 710, y: 465, width: 135 }
+      { device: 'desktop', x: 285, y: 140, width: 620 },
+      { device: 'laptop', x: 65, y: 420, width: 510 },
+      { device: 'tablet', x: 815, y: 290, width: 240 },
+      { device: 'mobile', x: 675, y: 465, width: 135 }
     ]
   },
   {
@@ -35,10 +35,10 @@ export const presets: Template[] = [
     canvas: { ...CANVAS_BASE },
     background: 'mint',
     placements: [
-      { device: 'desktop', x: 65, y: 240, width: 390 },
-      { device: 'laptop', x: 455, y: 355, width: 335 },
-      { device: 'tablet', x: 805, y: 255, width: 180 },
-      { device: 'mobile', x: 1020, y: 320, width: 115 }
+      { device: 'desktop', x: 25, y: 240, width: 390 },
+      { device: 'laptop', x: 415, y: 355, width: 335 },
+      { device: 'tablet', x: 765, y: 255, width: 180 },
+      { device: 'mobile', x: 980, y: 320, width: 115 }
     ]
   },
   {
