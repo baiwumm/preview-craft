@@ -472,6 +472,7 @@ export default function App(): ReactElement {
           onOpenSettings={() => setSettingsOpen(true)}
           theme={theme}
           onToggleTheme={toggleTheme}
+          busy={Boolean(job)}
         />
       </header>
 
@@ -486,33 +487,24 @@ export default function App(): ReactElement {
             shotErrors={shotErrors}
             onRetry={handleRetryDevice}
           />
-          {job ? (
-            <div className="bg-backdrop absolute inset-0 flex items-center justify-center">
-              <div className="bg-surface text-surface-foreground shadow-overlay rounded-xl p-6">
-                <p className="mb-3 text-sm">{job.text}</p>
-                <ProgressBar aria-label="任务进度" className="w-72" value={job.percent}>
-                  <ProgressBar.Track>
-                    <ProgressBar.Fill />
-                  </ProgressBar.Track>
-                </ProgressBar>
-              </div>
-            </div>
-          ) : null}
         </main>
 
         <aside className="border-separator w-96 shrink-0 border-l">
           <Tabs className="flex h-full flex-col">
-            <Tabs.ListContainer className="border-separator border-b px-3 pt-2">
-              <Tabs.List aria-label="侧栏">
-                <Tabs.Tab id="templates" className="text-sm">
+            <Tabs.ListContainer className="px-3 pt-3">
+              <Tabs.List
+                aria-label="侧栏"
+                className="bg-surface-secondary grid w-full grid-cols-3 gap-1 rounded-xl p-1"
+              >
+                <Tabs.Tab id="templates" className="rounded-lg text-center text-sm">
                   模板
                   <Tabs.Indicator />
                 </Tabs.Tab>
-                <Tabs.Tab id="style" className="text-sm">
+                <Tabs.Tab id="style" className="rounded-lg text-center text-sm">
                   样式
                   <Tabs.Indicator />
                 </Tabs.Tab>
-                <Tabs.Tab id="export" className="text-sm">
+                <Tabs.Tab id="export" className="rounded-lg text-center text-sm">
                   导出
                   <Tabs.Indicator />
                 </Tabs.Tab>
@@ -552,6 +544,20 @@ export default function App(): ReactElement {
             </Tabs.Panel>
           </Tabs>
         </aside>
+
+        {/* 任务遮罩：截图/导出期间覆盖画布与右侧面板，禁止交互 */}
+        {job ? (
+          <div className="bg-backdrop absolute inset-0 z-20 flex items-center justify-center">
+            <div className="bg-surface text-surface-foreground shadow-overlay rounded-xl p-6">
+              <p className="mb-3 text-sm">{job.text}</p>
+              <ProgressBar aria-label="任务进度" className="w-72" value={job.percent}>
+                <ProgressBar.Track>
+                  <ProgressBar.Fill />
+                </ProgressBar.Track>
+              </ProgressBar>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <SaveTemplateModal open={saveOpen} onOpenChange={setSaveOpen} onSave={handleSaveTemplate} />

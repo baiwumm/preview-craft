@@ -22,6 +22,8 @@ interface UrlBarProps {
   onOpenSettings: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  /** 任务进行中（截图/导出），顶栏操作禁用 */
+  busy?: boolean;
   ref?: Ref<UrlBarHandle>;
 }
 
@@ -34,6 +36,7 @@ export default function UrlBar({
   onOpenSettings,
   theme,
   onToggleTheme,
+  busy,
   ref
 }: UrlBarProps): ReactElement {
   const [mainDraft, setMainDraft] = useState(url);
@@ -121,13 +124,13 @@ export default function UrlBar({
             onBlur={() => submit(mainDraft, deviceDrafts, true)}
           />
         </TextField>
-        <Button variant="primary" onPress={() => submit(mainDraft, deviceDrafts, false)}>
+        <Button variant="primary" isDisabled={busy} onPress={() => submit(mainDraft, deviceDrafts, false)}>
           刷新预览
         </Button>
-        <Button variant="secondary" onPress={onCapture} aria-label="截图（Ctrl+Enter）">
+        <Button variant="secondary" isDisabled={busy} onPress={onCapture} aria-label="截图（Ctrl+Enter）">
           截图
         </Button>
-        <Button variant="ghost" onPress={onOpenSettings} aria-label="打开设置">
+        <Button variant="ghost" isDisabled={busy} onPress={onOpenSettings} aria-label="打开设置">
           设置
         </Button>
         <Button variant="ghost" onPress={onToggleTheme} aria-label="切换明暗主题">
@@ -145,7 +148,7 @@ export default function UrlBar({
           </Accordion.Heading>
           <Accordion.Panel>
             <Accordion.Body>
-              <div className="grid grid-cols-2 gap-3 pb-2">
+              <div className="bg-surface-secondary/60 border-separator grid grid-cols-2 gap-2.5 rounded-xl border p-3">
                 {deviceIds.map((device) => (
                   <TextField
                     key={device}
@@ -153,6 +156,7 @@ export default function UrlBar({
                     className="w-full"
                   >
                     <Input
+                      className="bg-background rounded-lg"
                       placeholder={`${devicePresets[device].label} · 留空使用主地址`}
                       value={deviceDrafts[device] ?? ''}
                       onChange={(event) => {

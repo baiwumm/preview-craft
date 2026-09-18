@@ -35,7 +35,7 @@ export default function TemplateGallery({
             active ? 'border-accent ring-accent ring-2' : 'border-transparent'
           }`}
         >
-          <ThumbCanvas template={template} scale={0.22} className="rounded-md" />
+          <ThumbCanvas template={template} scale={0.3} className="rounded-md" />
           <p className="mt-1 truncate text-xs font-medium">{template.name}</p>
           <p className="text-muted truncate text-[10px]">
             {isCustom ? '自定义' : template.subtitle}
@@ -61,14 +61,14 @@ export default function TemplateGallery({
     <div className="flex flex-col gap-4">
       <div>
         <p className="text-muted mb-2 text-xs font-semibold">预设</p>
-        <div className="grid grid-cols-2 gap-3">{presets.map((t) => renderItem(t, false))}</div>
+        <div className="grid grid-cols-1 gap-3">{presets.map((t) => renderItem(t, false))}</div>
       </div>
       <div>
         <p className="text-muted mb-2 text-xs font-semibold">自定义</p>
         {customTemplates.length === 0 ? (
           <p className="text-muted text-xs">还没有自定义模板，去「样式」页调整后另存。</p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {customTemplates.map((t) => renderItem(t, true))}
           </div>
         )}

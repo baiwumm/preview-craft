@@ -123,16 +123,32 @@ function registerIpc(): void {
   });
 }
 
-app.whenReady().then(() => {
-  // Windows 任务栏/通知归属：与 NSIS 快捷方式的应用模型 ID 保持一致
-  app.setAppUserModelId('com.previewcraft.desktop');
-  registerIpc();
-  createWindow();
+// 单实例：再次启动时聚焦已开窗口而不是开新实例
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  }
 });
+
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.whenReady().then(() => {
+    // Windows 任务栏/通知归属：与 NSIS 快捷方式的应用模型 ID 保持一致
+    app.setAppUserModelId('com.previewcraft.desktop');
+    registerIpc();
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
