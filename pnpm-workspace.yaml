@@ -1,0 +1,10 @@
+packages: []
+
+allowBuilds:
+  electron: true
+  electron-winstaller: false
+  esbuild: true
+
+trustPolicyExclude:
+  - semver@6.3.1
+  - semver@5.7.2

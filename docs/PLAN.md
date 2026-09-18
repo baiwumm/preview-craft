@@ -175,7 +175,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 
 ## 四、进度追踪
 
-- [ ] P0 骨架与风险验证
+- [x] P0 骨架与风险验证
 - [ ] P1 截图引擎
 - [ ] P2 前端主体
 - [ ] P3 模板系统
@@ -187,6 +187,8 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 日期 | 阶段 | 结果 | 遗留问题 |
 | --- | --- | --- | --- |
 | 2026-09-17 | 前置 | 旧代码清理完成（保留 .git/LICENSE）；Skill 与本计划落库；`desktop/` 目录被进程占用仅剩空壳，内容已清空 | 关闭占用进程后手动删除空目录 |
+| 2026-09-18 | 基线 | 提交 be7ac7c：清理旧 Web 版 + AGENTS/PLAN/Skill 落库 | — |
+| 2026-09-18 | P0 | 完成。骨架可运行（Electron 44 / electron-vite 5 / vite 8 / React 19 / HeroUI 3.2 / Tailwind 4.3 / TS 6.0），HeroUI 按钮 + 暗色主题 + 壳图显示已验证（截图核验）；**Spike A**：show:false 的 capturePage 产出 92,696 字节真实渐变 PNG → **P4 采用 show:false 方案**（offscreen:true 模式 74,526 字节可用作备选；「屏幕外坐标 + show:true」失败报 Current display surface not available，弃用）；**Spike B**：puppeteer-core 控本机 Chrome headless 截 example.com 产出 39,910 字节 2x PNG → 截图引擎路线可行；typecheck/lint 零错误 | ① 本会话环境 GPU 进程不可用，dev 启动即崩 → main 已按 `!app.isPackaged` 条件加 `no-sandbox`/`disable-gpu` 开关，打包版默认路径待 P5 实测；② pnpm 信任策略拦截 semver@6.3.1/5.7.2 → pnpm-workspace.yaml `trustPolicyExclude`；electron/esbuild 构建脚本经 `allowBuilds` 放行；③ TypeScript 锁 6.0.3（typescript-eslint 8.70 不支持 TS7）；④ 壳图恢复命令的 tag 实为 `1.3.0`（无 v 前缀），本计划中 `v1.3.0` 写法需留意；⑤ 内屏偏移取自旧版 enums（desktop 11/11、laptop 56/10、tablet 10/12、mobile 7/6），已固化进 devices.ts |
 
 ## 六、待确认
 
