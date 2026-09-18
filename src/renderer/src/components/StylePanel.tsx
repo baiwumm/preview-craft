@@ -1,4 +1,4 @@
-import { Button, ColorField, Label, parseColor, Slider, Switch } from '@heroui/react';
+import { Button, ColorField, Label, parseColor, Slider, Switch,Description } from '@heroui/react';
 import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
@@ -293,13 +293,15 @@ export default function StylePanel({
       </Section>
 
       <div className="flex flex-col gap-2">
+        <div className="flex gap-2">
         <Button variant="primary" onPress={onSaveAsTemplate}>
           另存为模板
         </Button>
         <Button variant="tertiary" onPress={onResetPreset} isDisabled={!canReset}>
           还原预设
         </Button>
-        <p className="text-muted text-xs">微调仅作用于当前会话，另存为模板后才会持久化。</p>
+        </div>
+        <Description>微调仅作用于当前会话，另存为模板后才会持久化。</Description>
       </div>
     </div>
   );

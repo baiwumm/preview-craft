@@ -491,17 +491,17 @@ export default function App(): ReactElement {
 
         <aside className="border-separator w-96 shrink-0 border-l">
           <Tabs className="flex h-full flex-col">
-            <Tabs.ListContainer className="border-separator border-b px-3 pt-2">
+            <Tabs.ListContainer>
               <Tabs.List aria-label="侧栏">
-                <Tabs.Tab id="templates" className="text-sm">
+                <Tabs.Tab id="templates">
                   模板
                   <Tabs.Indicator />
                 </Tabs.Tab>
-                <Tabs.Tab id="style" className="text-sm">
+                <Tabs.Tab id="style">
                   样式
                   <Tabs.Indicator />
                 </Tabs.Tab>
-                <Tabs.Tab id="export" className="text-sm">
+                <Tabs.Tab id="export">
                   导出
                   <Tabs.Indicator />
                 </Tabs.Tab>

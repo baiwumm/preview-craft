@@ -1,4 +1,4 @@
-import { Button, Label, ListBox, ProgressBar, Select } from '@heroui/react';
+import { Button, Label, ListBox, ProgressBar, Select,Description } from '@heroui/react';
 import type { ReactElement } from 'react';
 
 import type { ExportFormat } from '@shared/types';
@@ -93,7 +93,7 @@ export default function ExportPanel({
           </ListBox>
         </Select.Popover>
       </Select>
-
+            <div className="flex gap-2">
       <Button
         variant="secondary"
         onPress={onCapture}
@@ -108,10 +108,11 @@ export default function ExportPanel({
             : '导出中…'
           : '导出'}
       </Button>
-      <p className="text-muted text-xs">
+      </div>
+      <Description>
         仅截图 = 用真实截图替换画布预览；导出 = 截图 + 合成排版，完成后弹出保存对话框并复制到剪贴板。
-      </p>
-      <p className="text-muted text-xs">快捷键：Ctrl+Enter 截图 · Ctrl+S 导出 · Ctrl+V 贴网址</p>
+      </Description>
+      <Description>快捷键：Ctrl+Enter 截图 · Ctrl+S 导出 · Ctrl+V 贴网址</Description>
 
       {exporting ? (
         <ProgressBar aria-label="导出进度" value={exporting.percent}>
