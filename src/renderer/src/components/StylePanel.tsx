@@ -1,4 +1,4 @@
-import { Button, ColorField, Label, parseColor, Slider, Switch,Description } from '@heroui/react';
+import { Button, ColorField, ColorSwatch, Label, parseColor, Slider, Switch,Description } from '@heroui/react';
 import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
@@ -116,6 +116,9 @@ export default function StylePanel({
           >
             <Label>起始色</Label>
             <ColorField.Group>
+              <ColorField.Prefix>
+                <ColorSwatch color={style.customFrom || undefined} size="xs" />
+              </ColorField.Prefix>
               <ColorField.Input />
             </ColorField.Group>
           </ColorField>
@@ -135,6 +138,9 @@ export default function StylePanel({
           >
             <Label>结束色</Label>
             <ColorField.Group>
+              <ColorField.Prefix>
+                <ColorSwatch color={style.customTo || undefined} size="xs" />
+              </ColorField.Prefix>
               <ColorField.Input />
             </ColorField.Group>
           </ColorField>
