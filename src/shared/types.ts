@@ -65,6 +65,8 @@ export interface ExportRenderPayload {
   scale: 1 | 2 | 3;
   shots: Record<DeviceId, string>;
   style: ExportStyle;
+  /** 透明底垫白（JPG 导出不支持 alpha） */
+  flattenWhite?: boolean;
 }
 
 export interface AppSettings {

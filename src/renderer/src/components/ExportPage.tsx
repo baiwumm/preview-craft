@@ -11,6 +11,12 @@ export default function ExportPage(): ReactElement {
 
   useEffect(() => window.api.onExportRender(setPayload), []);
 
+  // 导出窗口页面必须透明（透明背景板导出无底 PNG），覆盖 index.html 的 bg-background
+  useEffect(() => {
+    document.documentElement.style.background = 'transparent';
+    document.body.style.background = 'transparent';
+  }, []);
+
   // WebP 编码：PNG dataURL → OffscreenCanvas.convertToBlob
   useEffect(
     () =>
@@ -48,7 +54,7 @@ export default function ExportPage(): ReactElement {
   if (!payload) return <div className="h-screen w-screen" />;
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background">
+    <div className="flex h-screen w-screen items-center justify-center">
       <Canvas
         template={payload.template}
         mainUrl=""
@@ -56,6 +62,8 @@ export default function ExportPage(): ReactElement {
         style={{ ...payload.style, customFrom: '', customTo: '' }}
         fixedScale={payload.scale}
         shots={payload.shots}
+        exportMode
+        flattenWhite={payload.flattenWhite}
       />
     </div>
   );

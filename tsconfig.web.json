@@ -19,8 +19,7 @@
     "paths": {
       "@/*": ["./src/renderer/src/*"],
       "@shared/*": ["./src/shared/*"],
-      "@templates/*": ["./src/renderer/templates/*"],
-      "@frames/*": ["./resources/frames/*"]
+      "@templates/*": ["./src/renderer/templates/*"]
     }
   },
   "include": [

@@ -41,6 +41,9 @@ export async function exportCompose(input: ExportComposeInput): Promise<{ path: 
     width: template.canvas.width,
     height: template.canvas.height,
     useContentSize: true,
+    // 透明窗口：透明背景板导出无底 PNG（capturePage 保留 alpha）
+    transparent: true,
+    backgroundColor: '#00000000',
     webPreferences: {
       // offscreen：隐藏窗口持续产帧，capturePage/CDP 均可靠（Spike A 备份路线）
       offscreen: true,
@@ -65,7 +68,9 @@ export async function exportCompose(input: ExportComposeInput): Promise<{ path: 
         borderRadius: style?.borderRadius ?? 0,
         shadow: style?.shadow ?? true,
         zoom
-      }
+      },
+      // JPG 不支持 alpha：透明底垫白
+      flattenWhite: format === 'jpg'
     };
     win.webContents.send('export:render', payload);
 

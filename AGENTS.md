@@ -60,8 +60,7 @@ preview-craft/
 ├─ package.json               # electron + electron-vite + electron-builder
 ├─ electron.vite.config.ts
 ├─ resources/
-│  ├─ frames/*.png            # 4 张设备壳图（desktop/laptop/tablet/mobile）
-│  └─ icon.*                  # 应用图标（P5 添加）
+│  └─ icon.*                  # 应用图标（P5 添加；设备壳已改为 CSS 绘制，无壳图资源）
 ├─ src/
 │  ├─ main/                   # 主进程（Node 环境）
 │  │  ├─ index.ts             # 窗口创建与生命周期

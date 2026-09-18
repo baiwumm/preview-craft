@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { devicePresets } from '@shared/devices';
 import type { DeviceId, Placement, Template } from '@shared/types';
 
-import { backgrounds } from '@templates/backgrounds';
+import { backgrounds, isTransparentBackground, CHECKER_CSS } from '@templates/backgrounds';
 
 import { buildCustomBackground, isCustomBackground, type StyleState } from '@/lib/design';
 
@@ -84,7 +84,9 @@ export default function StylePanel({
               >
                 <span
                   className="block h-6 w-full rounded"
-                  style={{ background: bg.value }}
+                  style={{
+                    background: isTransparentBackground(bg.key) ? CHECKER_CSS : bg.value
+                  }}
                   aria-hidden
                 />
                 <span className="text-foreground mt-1 block text-center text-[10px]">

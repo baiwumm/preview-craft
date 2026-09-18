@@ -2,7 +2,7 @@ import { devicePresets } from '@shared/devices';
 import type { Template } from '@shared/types';
 import type { ReactElement } from 'react';
 
-import { frameImages } from './DeviceFrame';
+import DeviceShellArt from './DeviceShell';
 
 import { resolveBackgroundCss } from '@templates/backgrounds';
 
@@ -13,7 +13,7 @@ interface ThumbCanvasProps {
   className?: string;
 }
 
-/** 静态缩略图：按模板 placements 渲染设备壳 + 占位色块，无 iframe */
+/** 静态缩略图：按模板 placements 渲染 CSS 设备壳 + 占位色块，无 iframe */
 export default function ThumbCanvas({
   template,
   scale = 0.25,
@@ -38,7 +38,7 @@ export default function ThumbCanvas({
       >
         {template.placements.map((placement) => {
           const preset = devicePresets[placement.device];
-          const { aspect, inner } = preset.frame;
+          const { aspect, inner, screenRadius } = preset.frame;
           const k = placement.width / preset.frame.width;
           return (
             <div
@@ -49,11 +49,10 @@ export default function ThumbCanvas({
                 top: placement.y,
                 width: placement.width,
                 height: placement.width / aspect,
-                backgroundImage: `url(${frameImages[placement.device]})`,
-                backgroundSize: '100% 100%',
                 transform: placement.rotation ? `rotate(${placement.rotation}deg)` : undefined
               }}
             >
+              <DeviceShellArt device={placement.device} k={k} />
               <div
                 className="absolute bg-white/70"
                 style={{
@@ -61,7 +60,7 @@ export default function ThumbCanvas({
                   top: inner.y * k,
                   width: inner.width * k,
                   height: inner.height * k,
-                  borderRadius: 8 * k
+                  borderRadius: screenRadius * k
                 }}
               />
             </div>

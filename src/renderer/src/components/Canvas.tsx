@@ -1,7 +1,7 @@
 import type { DeviceId, Template } from '@shared/types';
 import type { ReactElement } from 'react';
 
-import { resolveBackgroundCss } from '@templates/backgrounds';
+import { isTransparentBackground, resolveBackgroundCss, CHECKER_CSS } from '@templates/backgrounds';
 
 import DeviceFrame from './DeviceFrame';
 
@@ -21,6 +21,10 @@ interface CanvasProps {
   shotErrors?: Partial<Record<DeviceId, string | boolean>>;
   /** 单台重试 */
   onRetry?: (device: DeviceId) => void;
+  /** 导出态：透明底不铺棋盘格 */
+  exportMode?: boolean;
+  /** 透明底垫白（JPG 导出不支持 alpha） */
+  flattenWhite?: boolean;
 }
 
 /**
@@ -35,12 +39,20 @@ export default function Canvas({
   fixedScale,
   shots,
   shotErrors,
-  onRetry
+  onRetry,
+  exportMode,
+  flattenWhite
 }: CanvasProps): ReactElement {
   const { borderRadius, shadow, zoom } = style;
   const { ref, scale } = useFitScale(template.canvas.width, template.canvas.height);
   const fit = fixedScale ?? scale;
   const total = fit * zoom;
+  const transparentBg = isTransparentBackground(template.background);
+  const background = exportMode
+    ? resolveBackgroundCss(template.background, flattenWhite)
+    : transparentBg
+      ? CHECKER_CSS
+      : resolveBackgroundCss(template.background);
 
   return (
     <div ref={ref} className="flex h-full w-full items-center justify-center overflow-hidden">
@@ -49,7 +61,7 @@ export default function Canvas({
         style={{
           width: template.canvas.width * fit,
           height: template.canvas.height * fit,
-          background: resolveBackgroundCss(template.background),
+          background,
           borderRadius
         }}
       >

@@ -85,9 +85,10 @@ src/
 │  ├─ src/components/  UrlBar / Canvas / DeviceFrame / TemplateGallery / StylePanel / ExportPanel / SettingsModal / BrowserGuideModal …
 │  └─ templates/       模板 schema、5 套预设、背景板
 └─ shared/          # 三层共用的类型契约、设备 preset、URL 规范化
-resources/frames/   # 4 张设备壳图（vite 随 renderer 打包）
 docs/PLAN.md        # 开发计划与各阶段执行记录
 ```
+
+（设备壳为纯 CSS 绘制，见 `src/renderer/src/components/DeviceShell.tsx`，几何规格在 `src/shared/devices.ts`。）
 
 ### 进程边界
 
