@@ -76,10 +76,21 @@ export interface AppSettings {
   defaultBackground?: string;
 }
 
+export interface CacheStats {
+  files: number;
+  bytes: number;
+}
+
+export interface BrowserDownloadProgress {
+  percent: number;
+  downloadedBytes?: number;
+  totalBytes?: number;
+}
+
 export interface Api {
   browserDetect(): Promise<{ found: BrowserInfo[]; active?: BrowserInfo }>;
   browserDownload(): Promise<{ path: string }>;
-  onBrowserDownloadProgress(listener: (progress: { percent: number }) => void): () => void;
+  onBrowserDownloadProgress(listener: (progress: BrowserDownloadProgress) => void): () => void;
   captureStart(input: CaptureStartInput): Promise<CaptureResult>;
   onCaptureProgress(listener: (progress: CaptureProgress) => void): () => void;
   exportCompose(input: ExportComposeInput): Promise<{ path: string }>;
@@ -92,6 +103,13 @@ export interface Api {
   exportWebpResult(data: ArrayBuffer): void;
   settingsGet(): Promise<AppSettings>;
   settingsSet(patch: Partial<AppSettings>): Promise<AppSettings>;
+  /** 截图/导出临时缓存（temp/preview-craft）统计与清理 */
+  cacheStats(): Promise<CacheStats>;
+  cacheClear(): Promise<CacheStats>;
+  /** 主进程文件对话框选择浏览器可执行文件，取消返回 null */
+  pickBrowserPath(): Promise<{ path: string | null }>;
+  /** 主进程读取系统剪贴板文本（Ctrl+V 到 URL 输入用） */
+  clipboardReadText(): Promise<string>;
   /** 读取截图文件转 dataURL（预览态 Canvas 显示用） */
   shotDataUrl(path: string): Promise<string>;
   templatesGet(): Promise<Template[]>;

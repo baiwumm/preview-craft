@@ -2,11 +2,13 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 
 import type { DeviceId, ExportComposeInput, ExportRenderPayload } from '@shared/types';
 
 import { deviceIds } from '@shared/devices';
+
+import { shotCacheDir } from './capture';
 
 const EXPORT_HTML = join(__dirname, '../renderer/index.html');
 
@@ -112,7 +114,7 @@ export async function exportCompose(input: ExportComposeInput): Promise<{ path: 
       buffer = await convertWebpInPage(win, image.toPNG(), quality ?? 90);
     }
 
-    const outDir = join(app.getPath('temp'), 'preview-craft');
+    const outDir = shotCacheDir();
     await mkdir(outDir, { recursive: true });
     const outPath = join(outDir, `export-${randomUUID()}.${format}`);
     await writeFile(outPath, buffer);

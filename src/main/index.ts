@@ -3,7 +3,7 @@ import { copyFile, readFile } from 'node:fs/promises';
 import { ClipboardItem, clipboard, dialog, BrowserWindow, app, ipcMain } from 'electron';
 
 import { detectBrowsers, ensureBrowser } from './browser';
-import { captureStart, closeBrowser, runCaptureSelfTest } from './capture';
+import { cacheClear, cacheStats, captureStart, closeBrowser } from './capture';
 import { exportCompose, shotToDataUrl } from './export';
 import {
   deleteCustomTemplate,
@@ -14,14 +14,10 @@ import {
 } from './store';
 
 // 开发环境所在会话 GPU 进程不可用（GPU process isn't usable → 启动即崩），
-// 仅在未打包时禁用 GPU 与 Chromium 沙箱；打包版的 GPU/沙箱行为保持默认，待 P5 安装实测验证。
+// 仅在未打包时禁用 GPU 与 Chromium 沙箱；打包版走默认路径（P5 安装实测待确认，见 PLAN「待确认」）。
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-gpu');
-}
-// 自验钩子（P5 随 PC_CAPTURE_TEST 一并移除）：环境变量传入端口，供 p4-verify.mjs CDP 驱动
-if (process.env.PC_REMOTE_DEBUGGING_PORT) {
-  app.commandLine.appendSwitch('remote-debugging-port', process.env.PC_REMOTE_DEBUGGING_PORT);
 }
 
 function createWindow(): void {
@@ -80,6 +76,24 @@ function registerIpc(): void {
 
   ipcMain.handle('settings:set', (_event, patch) => setSettings(patch));
 
+  ipcMain.handle('cache:stats', () => cacheStats());
+
+  ipcMain.handle('cache:clear', () => cacheClear());
+
+  ipcMain.handle('dialog:pick-browser', async () => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    const result = await dialog.showOpenDialog(win, {
+      title: '选择浏览器可执行文件',
+      buttonLabel: '使用此文件',
+      filters: [{ name: '浏览器可执行文件', extensions: ['exe'] }],
+      properties: ['openFile']
+    });
+    return { path: result.canceled ? null : (result.filePaths[0] ?? null) };
+  });
+
+  // renderer 无 clipboard 读权限，Ctrl+V 到 URL 输入由主进程代读系统剪贴板
+  ipcMain.handle('clipboard:read-text', () => clipboard.readText());
+
   ipcMain.handle('templates:get', () => getCustomTemplates());
 
   ipcMain.handle('templates:save', (_event, template) => saveCustomTemplate(template));
@@ -109,17 +123,11 @@ function registerIpc(): void {
   });
 }
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
+  // Windows 任务栏/通知归属：与 NSIS 快捷方式的应用模型 ID 保持一致
+  app.setAppUserModelId('com.previewcraft.desktop');
   registerIpc();
   createWindow();
-
-  // P1 自验：PC_CAPTURE_TEST=<url> 时执行截图自检后退出，P5 移除
-  const selfTestUrl = process.env.PC_CAPTURE_TEST;
-  if (selfTestUrl) {
-    await runCaptureSelfTest(selfTestUrl);
-    app.exit(0);
-    return;
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

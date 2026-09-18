@@ -1,17 +1,68 @@
 /// <reference lib="dom" />
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import puppeteer, { type Browser } from 'puppeteer-core';
 import { app } from 'electron';
 
-import type { CaptureProgress, CaptureResult, CaptureStartInput, DeviceId } from '@shared/types';
+import type { CacheStats, CaptureProgress, CaptureResult, CaptureStartInput, DeviceId } from '@shared/types';
 
 import { devicePresets, deviceIds } from '@shared/devices';
 
-import { detectBrowsers } from './browser';
+/** 截图与导出产物的临时目录（设置页「清除缓存」的作用域） */
+export function shotCacheDir(): string {
+  return join(app.getPath('temp'), 'preview-craft');
+}
+
+export async function cacheStats(): Promise<CacheStats> {
+  const dir = shotCacheDir();
+  let files = 0;
+  let bytes = 0;
+  try {
+    for (const name of await readdir(dir)) {
+      try {
+        const info = await stat(join(dir, name));
+        if (info.isFile()) {
+          files += 1;
+          bytes += info.size;
+        }
+      } catch {
+        // 读取单个文件信息失败，忽略
+      }
+    }
+  } catch {
+    // 目录尚未创建
+  }
+  return { files, bytes };
+}
+
+/** 清理临时截图/导出产物；被占用的文件跳过不报错 */
+export async function cacheClear(): Promise<CacheStats> {
+  const dir = shotCacheDir();
+  let names: string[];
+  try {
+    names = await readdir(dir);
+  } catch {
+    return { files: 0, bytes: 0 };
+  }
+  let removed = 0;
+  let bytes = 0;
+  for (const name of names) {
+    const full = join(dir, name);
+    try {
+      const info = await stat(full);
+      if (!info.isFile()) continue;
+      await rm(full, { force: true });
+      removed += 1;
+      bytes += info.size;
+    } catch {
+      // 文件被占用或已消失，跳过
+    }
+  }
+  return { files: removed, bytes };
+}
 
 /** 浏览器实例复用：连续截图不重复 launch */
 let browserPromise: Promise<Browser> | null = null;
@@ -155,7 +206,7 @@ export async function captureStart(
   onProgress: (progress: CaptureProgress) => void
 ): Promise<CaptureResult> {
   const browser = await launchBrowser(executablePath);
-  const outDir = join(app.getPath('temp'), 'preview-craft');
+  const outDir = shotCacheDir();
   await mkdir(outDir, { recursive: true });
 
   const devices = input.devices.length > 0 ? input.devices : deviceIds;
@@ -177,24 +228,4 @@ export async function captureStart(
   );
 
   return result;
-}
-
-/** P1 自验钩子：PC_CAPTURE_TEST=<url> 时对 4 设备截图并打印结果，P5 移除 */
-export async function runCaptureSelfTest(url: string): Promise<void> {
-  const detected = await detectBrowsers();
-  if (detected.length === 0) {
-    console.log('[P1 self-test] 未检测到可用浏览器');
-    return;
-  }
-  console.log(`[P1 self-test] browser: ${detected[0].path}`);
-  const result = await captureStart(detected[0].path, { url, deviceUrls: {}, devices: [] }, (p) => {
-    console.log(`[P1 self-test] ${p.device} -> ${p.status}${p.error ? ` (${p.error})` : ''}`);
-  });
-  for (const [device, path] of Object.entries(result.shots)) {
-    console.log(`[P1 self-test] shot ${device}: ${path}`);
-  }
-  for (const [device, error] of Object.entries(result.errors)) {
-    console.log(`[P1 self-test] error ${device}: ${error}`);
-  }
-  await closeBrowser();
 }

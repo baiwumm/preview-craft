@@ -3,10 +3,16 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Browser, detectBrowserPlatform, install, resolveBuildId } from '@puppeteer/browsers';
+import {
+  Browser,
+  detectBrowserPlatform,
+  getInstalledBrowsers,
+  install,
+  resolveBuildId
+} from '@puppeteer/browsers';
 import { app, BrowserWindow } from 'electron';
 
-import type { BrowserInfo } from '@shared/types';
+import type { BrowserDownloadProgress, BrowserInfo } from '@shared/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -40,7 +46,7 @@ async function registryLookup(kind: BrowserInfo['kind'], exeName: string): Promi
   return null;
 }
 
-/** 检测本机可用浏览器：常见路径枚举优先（零子进程开销），注册表 App Paths 兜底 */
+/** 检测可用浏览器：本机路径枚举优先（零子进程开销）、注册表 App Paths 兜底，最后带上已下载的 Chromium */
 export async function detectBrowsers(): Promise<BrowserInfo[]> {
   const found: BrowserInfo[] = [];
   const seen = new Set<string>();
@@ -71,26 +77,51 @@ export async function detectBrowsers(): Promise<BrowserInfo[]> {
     }
   }
 
+  const cached = await installedChromium();
+  if (cached && !seen.has(cached.path)) {
+    found.push(cached);
+  }
+
   return found;
 }
 
 /** Chromium 下载目录 */
-function chromiumCacheDir(): string {
+export function chromiumCacheDir(): string {
   return join(app.getPath('userData'), 'chromium');
 }
 
-function sendDownloadProgress(percent: number): void {
+function sendDownloadProgress(progress: BrowserDownloadProgress): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('browser:download:progress', { percent });
+    win.webContents.send('browser:download:progress', progress);
+  }
+}
+
+/** userData/chromium 下已有可用 Chromium 时直接复用，避免重复下载 */
+export async function installedChromium(): Promise<BrowserInfo | null> {
+  const dir = chromiumCacheDir();
+  if (!existsSync(dir)) return null;
+  try {
+    const installed = await getInstalledBrowsers({ cacheDir: dir });
+    const usable = installed.find(
+      (item) =>
+        (item.browser === Browser.CHROME || item.browser === Browser.CHROMIUM) &&
+        existsSync(item.executablePath)
+    );
+    return usable ? { kind: 'chromium', path: usable.executablePath } : null;
+  } catch {
+    return null;
   }
 }
 
 /**
- * 确保存在可用浏览器：优先使用已检测到的本机浏览器，
- * 都没有时下载 Chromium 到 userData/chromium，带进度事件。
+ * 确保存在可用浏览器：优先自定义路径，其次本机浏览器与已下载的 Chromium，
+ * 都没有时下载 Chromium（带进度事件）。
  */
 export async function ensureBrowser(customPath?: string): Promise<BrowserInfo> {
-  if (customPath && existsSync(customPath)) {
+  if (customPath) {
+    if (!existsSync(customPath)) {
+      throw new Error(`自定义浏览器路径不存在：${customPath}`);
+    }
     return { kind: 'chromium', path: customPath };
   }
 
@@ -104,13 +135,20 @@ export async function ensureBrowser(customPath?: string): Promise<BrowserInfo> {
     throw new Error('无法识别当前平台，无法下载 Chromium');
   }
   const buildId = await resolveBuildId(Browser.CHROME, platform, 'stable');
-  sendDownloadProgress(0);
-  // @puppeteer/browsers v3 的 install 已移除 progressCallback，进度事件仅上报起止
+  sendDownloadProgress({ percent: 0 });
+  let lastSent = 0;
   const result = await install({
     browser: Browser.CHROME,
     buildId,
-    cacheDir: chromiumCacheDir()
+    cacheDir: chromiumCacheDir(),
+    // 下载阶段上报真实进度（整数百分比变化才发，避免 IPC 刷屏）；解包阶段完成后补发 100%
+    downloadProgressCallback: (downloadedBytes, totalBytes) => {
+      const percent = totalBytes > 0 ? Math.min(99, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+      if (percent === lastSent) return;
+      lastSent = percent;
+      sendDownloadProgress({ percent, downloadedBytes, totalBytes });
+    }
   });
-  sendDownloadProgress(100);
+  sendDownloadProgress({ percent: 100 });
   return { kind: 'chromium', path: result.executablePath };
 }

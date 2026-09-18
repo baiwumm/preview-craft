@@ -68,7 +68,7 @@ export default function Canvas({
               url={deviceUrls[placement.device] || mainUrl}
               shadow={shadow}
               shot={shots?.[placement.device]}
-              shotError={Boolean(shotErrors?.[placement.device])}
+              shotError={shotErrors?.[placement.device]}
               onRetry={onRetry ? () => onRetry(placement.device) : undefined}
             />
           ))}

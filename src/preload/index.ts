@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   Api,
   BrowserInfo,
+  CacheStats,
   CaptureProgress,
   CaptureStartInput,
   CaptureResult,
@@ -21,7 +22,16 @@ function subscribe<T>(channel: string, listener: Listener<T>): () => void {
   };
 }
 
-export type { BrowserInfo, CaptureProgress, CaptureStartInput, CaptureResult, ExportComposeInput, ExportFormat, AppSettings };
+export type {
+  AppSettings,
+  BrowserInfo,
+  CacheStats,
+  CaptureProgress,
+  CaptureStartInput,
+  CaptureResult,
+  ExportComposeInput,
+  ExportFormat
+};
 
 const api: Api = {
   browserDetect: () => ipcRenderer.invoke('browser:detect'),
@@ -38,6 +48,10 @@ const api: Api = {
   exportWebpResult: (data) => ipcRenderer.send('export:webp:result', data),
   settingsGet: () => ipcRenderer.invoke('settings:get'),
   settingsSet: (patch) => ipcRenderer.invoke('settings:set', patch),
+  cacheStats: () => ipcRenderer.invoke('cache:stats'),
+  cacheClear: () => ipcRenderer.invoke('cache:clear'),
+  pickBrowserPath: () => ipcRenderer.invoke('dialog:pick-browser'),
+  clipboardReadText: () => ipcRenderer.invoke('clipboard:read-text'),
   shotDataUrl: (path) => ipcRenderer.invoke('shot:dataurl', path),
   templatesGet: () => ipcRenderer.invoke('templates:get'),
   templatesSave: (template) => ipcRenderer.invoke('templates:save', template),

@@ -14,6 +14,7 @@ interface ExportPanelProps {
   scale: 1 | 2 | 3;
   onFormatChange: (format: ExportFormat) => void;
   onScaleChange: (scale: 1 | 2 | 3) => void;
+  onCapture: () => void;
   onExport: () => void;
   exporting: ExportProgress | null;
   canExport: boolean;
@@ -37,6 +38,7 @@ export default function ExportPanel({
   scale,
   onFormatChange,
   onScaleChange,
+  onCapture,
   onExport,
   exporting,
   canExport
@@ -92,12 +94,24 @@ export default function ExportPanel({
         </Select.Popover>
       </Select>
 
+      <Button
+        variant="secondary"
+        onPress={onCapture}
+        isDisabled={!canExport || exporting !== null}
+      >
+        {exporting?.phase === 'capturing' ? '截取中…' : '仅截图'}
+      </Button>
       <Button variant="primary" onPress={onExport} isDisabled={!canExport || exporting !== null}>
-        {exporting ? '导出中…' : '导出'}
+        {exporting
+          ? exporting.phase === 'capturing'
+            ? '截取中…'
+            : '导出中…'
+          : '导出'}
       </Button>
       <p className="text-muted text-xs">
-        导出 = 逐设备真实截图 + 合成排版，完成后弹出保存对话框并复制到剪贴板。
+        仅截图 = 用真实截图替换画布预览；导出 = 截图 + 合成排版，完成后弹出保存对话框并复制到剪贴板。
       </p>
+      <p className="text-muted text-xs">快捷键：Ctrl+Enter 截图 · Ctrl+S 导出 · Ctrl+V 贴网址</p>
 
       {exporting ? (
         <ProgressBar aria-label="导出进度" value={exporting.percent}>

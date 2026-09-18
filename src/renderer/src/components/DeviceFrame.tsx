@@ -26,8 +26,8 @@ interface DeviceFrameProps {
   shadow?: boolean;
   /** 已截取的设备画面（dataURL），存在时替代 iframe 预览（导出态） */
   shot?: string;
-  /** 该设备截图失败标记 */
-  shotError?: boolean;
+  /** 该设备截图失败（true 或具体原因文案） */
+  shotError?: string | boolean;
   /** 单台重试回调 */
   onRetry?: () => void;
 }
@@ -87,10 +87,12 @@ export default function DeviceFrame({
         />
       ) : shotError ? (
         <div
-          className="absolute flex flex-col items-center justify-center gap-2 bg-danger/15"
+          className="absolute flex flex-col items-center justify-center gap-2 bg-danger/15 px-2 text-center"
           style={innerStyle}
         >
-          <span className="text-danger text-xs">截图失败</span>
+          <span className="text-danger text-[10px] leading-tight break-words">
+            {typeof shotError === 'string' && shotError ? shotError : '截图失败'}
+          </span>
           {onRetry ? (
             <Button size="sm" variant="primary" onPress={onRetry}>
               重试

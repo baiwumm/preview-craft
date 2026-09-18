@@ -5,6 +5,8 @@
 export function normalizeUrl(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
+  // 含空白的串（如误粘了「not a valid url」+ 域名）一律视为非法
+  if (/\s/.test(trimmed)) return null;
 
   const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   let url: URL;

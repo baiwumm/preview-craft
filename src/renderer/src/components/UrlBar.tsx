@@ -1,31 +1,45 @@
 import { Accordion, Button, Input, TextField } from '@heroui/react';
-import { useCallback, useState } from 'react';
-import type { KeyboardEvent, ReactElement } from 'react';
+import { useCallback, useImperativeHandle, useRef, useState } from 'react';
+import type { KeyboardEvent, ReactElement, Ref } from 'react';
 
 import { deviceIds, devicePresets } from '@shared/devices';
 import type { DeviceId } from '@shared/types';
 
 import { normalizeUrl } from '@shared/url';
 
+export interface UrlBarHandle {
+  /** 写入并提交一个地址（Ctrl+V 粘贴到地址栏用） */
+  applyText: (text: string) => void;
+  /** 聚焦地址输入框 */
+  focus: () => void;
+}
+
 interface UrlBarProps {
   url: string;
   deviceUrls: Partial<Record<DeviceId, string>>;
   onApply: (mainUrl: string, deviceUrls: Partial<Record<DeviceId, string>>) => void;
+  onCapture: () => void;
+  onOpenSettings: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  ref?: Ref<UrlBarHandle>;
 }
 
-/** 顶栏：主 URL 输入（回车刷新预览）+ 分设备 URL 折叠区 + 主题切换 */
+/** 顶栏：主 URL 输入（回车刷新预览）+ 截图 / 设置入口 + 分设备 URL 折叠区 */
 export default function UrlBar({
   url,
   deviceUrls,
   onApply,
+  onCapture,
+  onOpenSettings,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  ref
 }: UrlBarProps): ReactElement {
   const [mainDraft, setMainDraft] = useState(url);
   const [deviceDrafts, setDeviceDrafts] = useState<Partial<Record<DeviceId, string>>>(deviceUrls);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   /** 校验并提交：主 URL 非空时必须合法；分设备 URL 非空时必须合法，否则回落主地址 */
   const submit = useCallback(
@@ -75,6 +89,15 @@ export default function UrlBar({
     [mainDraft, deviceDrafts, submit]
   );
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      applyText: (text: string) => submit(text, deviceDrafts, false),
+      focus: () => inputRef.current?.focus()
+    }),
+    [submit, deviceDrafts]
+  );
+
   const handleDeviceKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') submit(mainDraft, deviceDrafts, true);
@@ -87,6 +110,7 @@ export default function UrlBar({
       <div className="flex items-center gap-3">
         <TextField aria-label="网站地址" className="flex-1">
           <Input
+            ref={inputRef}
             placeholder="输入网址，回车刷新预览（如 github.com）"
             value={mainDraft}
             onChange={(event) => {
@@ -99,6 +123,12 @@ export default function UrlBar({
         </TextField>
         <Button variant="primary" onPress={() => submit(mainDraft, deviceDrafts, false)}>
           刷新预览
+        </Button>
+        <Button variant="secondary" onPress={onCapture} aria-label="截图（Ctrl+Enter）">
+          截图
+        </Button>
+        <Button variant="ghost" onPress={onOpenSettings} aria-label="打开设置">
+          设置
         </Button>
         <Button variant="ghost" onPress={onToggleTheme} aria-label="切换明暗主题">
           {theme === 'dark' ? '浅色' : '深色'}
