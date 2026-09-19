@@ -53,6 +53,7 @@ const ALL_DEVICES = ['desktop', 'laptop', 'tablet', 'mobile'];
 const CAPTURE_TIMEOUT = 300_000;
 
 const results = [];
+const skips = [];
 const pageErrors = [];
 
 function log(line) {
@@ -65,6 +66,15 @@ function check(name, pass, detail = '') {
   results.push({ name, pass: Boolean(pass), detail });
   log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
   if (!pass) process.exitCode = 1;
+}
+
+/**
+ * 依赖外部条件的断言走不通时显式记一笔：跳过的断言不进分母，于是「112/112 全绿」
+ * 看着像满覆盖，实际那条用户可见的分支这一轮根本没人验过。
+ */
+function skip(name, reason) {
+  skips.push({ name, reason });
+  log(`SKIP  ${name} — ${reason}`);
 }
 
 function section(title) {
@@ -502,6 +512,16 @@ async function runAppSection() {
       page.evaluate(() => [...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0));
 
     /**
+     * 窗口不再产帧时（锁屏 / 熄屏 / 被最小化），CSS 动画的时间轴冻在原地，
+     * animationend 永不到达 —— 已关闭的弹窗节点不卸载，遮罩吞掉后续每一次点击，
+     * 一处环境干扰就伪装成十几条应用缺陷（2.1.3 装机收口时踩到 15 条）。连着两次
+     * 取证到这种状态就判红收工，别让人去查不存在的 bug。
+     * 判据只用 visibilityState：被别的窗口盖住并不会冻结（实测），而空闲页面本来
+     * 就可以不推进 timeline，拿它当条件会误杀正常的失败现场。
+     */
+    let frozenScenes = 0;
+
+    /**
      * 等某个 DOM 条件成立。打包版整体比 out/ 慢（asar 读取 + 真实 GPU 合成），
      * 固定 sleep 会让点击落在页签/弹窗切换的中间态上，后续断言连锁失败。
      * 超时则转储现场（弹窗标题与输入值、活动页签、焦点元素），否则只能看到一串
@@ -510,24 +530,53 @@ async function runAppSection() {
     const waitTrue = async (label, expr, arg, timeout = 10_000) => {
       const hit = await soft(label, () => page.waitForFunction(expr, { timeout, polling: 200 }, arg));
       if (!hit) {
-        const scene = await page.evaluate(() => ({
-          dialogs: [...document.querySelectorAll('.modal__dialog')].map((el) => ({
-            heading: el.querySelector('h2')?.textContent?.trim(),
-            inputs: [...el.querySelectorAll('input')].map((i) => `${i.placeholder || i.type}=${i.value}`),
-            buttons: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean),
-            h: Math.round(el.getBoundingClientRect().height)
-          })),
-          activeTab: [...document.querySelectorAll('aside [role="tab"]')]
-            .find((t) => t.getAttribute('aria-selected') === 'true' || t.dataset.selected === 'true')?.textContent?.trim(),
-          focus: `${document.activeElement?.tagName}#${document.activeElement?.id || ''} ${(document.activeElement?.getAttribute('placeholder') || document.activeElement?.textContent || '').trim().slice(0, 24)}`,
-          topAtAside: (() => {
-            const el = document.elementFromPoint(window.innerWidth - 190, window.innerHeight / 2);
-            return el ? `${el.tagName}.${String(el.className).slice(0, 40)}` : null;
-          })(),
-          rotated: document.querySelectorAll('main [style*="rotate("]').length,
-          imgs: document.querySelectorAll('main img').length
-        }));
+        const scene = await page.evaluate(async () => {
+          // 两次采样 animation timeline： currentTime 不推进就说明合成器停发帧，
+          // 退场动画的 animationend 永不到达 —— 弹窗节点不卸载，遮罩吞掉后续所有点击。
+          const t0 = document.timeline.currentTime;
+          await new Promise((r) => setTimeout(r, 600));
+          const t1 = document.timeline.currentTime;
+          const dialog = document.querySelector('.modal__dialog');
+          return {
+            dialogs: [...document.querySelectorAll('.modal__dialog')].map((el) => ({
+              heading: el.querySelector('h2')?.textContent?.trim(),
+              inputs: [...el.querySelectorAll('input')].map((i) => `${i.placeholder || i.type}=${i.value}`),
+              buttons: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean),
+              h: Math.round(el.getBoundingClientRect().height)
+            })),
+            timeline: `${t0}→${t1}`,
+            frozen: document.visibilityState !== 'visible',
+            vis: document.visibilityState,
+            hasFocus: document.hasFocus(),
+            anims: document
+              .getAnimations()
+              .filter((a) => !a.effect?.target?.className?.includes?.('scroll-shadow'))
+              .map((a) => {
+                const t = a.effect?.target;
+                const owned = dialog && t && (dialog === t || dialog.contains(t));
+                return `${owned ? 'dialog:' : ''}${a.playState}@${Math.round(a.currentTime ?? -1)}`;
+              })
+              .slice(0, 6),
+            activeTab: [...document.querySelectorAll('aside [role="tab"]')]
+              .find((t) => t.getAttribute('aria-selected') === 'true' || t.dataset.selected === 'true')?.textContent?.trim(),
+            focus: `${document.activeElement?.tagName}#${document.activeElement?.id || ''} ${(document.activeElement?.getAttribute('placeholder') || document.activeElement?.textContent || '').trim().slice(0, 24)}`,
+            topAtAside: (() => {
+              const el = document.elementFromPoint(window.innerWidth - 190, window.innerHeight / 2);
+              return el ? `${el.tagName}.${String(el.className).slice(0, 40)}` : null;
+            })(),
+            rotated: document.querySelectorAll('main [style*="rotate("]').length,
+            imgs: document.querySelectorAll('main img').length
+          };
+        });
         log(`      [scene] ${JSON.stringify(scene)}`);
+        if (!scene.frozen) {
+          frozenScenes = 0;
+        } else if (++frozenScenes >= 2) {
+          throw new Error(
+            `应用窗口已不可见（visibility=${scene.vis}，动画时间轴 ${scene.timeline}），弹窗退场动画无法结束 —— ` +
+              '后续断言全部不可信，请让窗口保持可见后重跑本轮冒烟'
+          );
+        }
       }
       await sleep(250);
       return Boolean(hit);
@@ -576,11 +625,15 @@ async function runAppSection() {
        本机到 github.com 常要 10s 上下，探测失败时按「未探到」跳过严格断言，不算回归。 */
     const probeBlockedSite = await soft('previewProbe 拒绝内嵌站点', () => api('previewProbe', SITE));
     const siteProbed = probeBlockedSite?.probed === true;
-    check(
-      'previewProbe 对拒绝内嵌站点的判定',
-      !siteProbed || (probeBlockedSite.blocked === true && /X-Frame-Options|frame-ancestors/.test(probeBlockedSite.reason ?? '')),
-      siteProbed ? JSON.stringify(probeBlockedSite) : '探测未成功（网络），跳过判定'
-    );
+    if (!siteProbed) {
+      skip('previewProbe 对拒绝内嵌站点的判定', `站点 ${SITE} 探测未成功（网络），本轮未验到拦截分支`);
+    } else {
+      check(
+        'previewProbe 对拒绝内嵌站点的判定',
+        probeBlockedSite.blocked === true && /X-Frame-Options|frame-ancestors/.test(probeBlockedSite.reason ?? ''),
+        JSON.stringify(probeBlockedSite)
+      );
+    }
     const probeOpenSite = await soft('previewProbe 可内嵌站点', () => api('previewProbe', 'https://example.com'));
     check(
       'previewProbe 放行可内嵌站点',
@@ -596,7 +649,10 @@ async function runAppSection() {
         await waitTrue('等拦截占位出现', `document.body.innerText.includes('该站点禁止内嵌预览')`, undefined, 20_000)
       );
     } else {
-      log('      [skip] 站点未被探明，跳过画布占位说明断言');
+      skip(
+        '被拦站点在画布上给出占位说明',
+        siteProbed ? `站点 ${SITE} 允许内嵌，本轮无拦截分支可验` : `站点 ${SITE} 探测未成功（网络）`
+      );
     }
 
     await tap(page, locator('span', '分设备 URL', false));
@@ -997,8 +1053,9 @@ async function main() {
 
   const failed = results.filter((r) => !r.pass);
   section('汇总');
-  log(`${results.length - failed.length}/${results.length} PASS`);
+  log(`${results.length - failed.length}/${results.length} PASS${skips.length ? ` + ${skips.length} SKIP（本轮未验到）` : ''}`);
   for (const f of failed) log(`  FAIL  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
+  for (const s of skips) log(`  SKIP  ${s.name} — ${s.reason}`);
   await writeFile(join(OUT_DIR, 'smoke-results.json'), JSON.stringify(results, null, 2), 'utf8');
 }
 
