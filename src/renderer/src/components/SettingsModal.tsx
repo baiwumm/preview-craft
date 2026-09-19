@@ -14,6 +14,8 @@ import type { ReactElement } from 'react';
 import { backgrounds } from '@templates/backgrounds';
 import { describeBrowserKind, formatBytes } from '@/lib/format';
 
+import ChromiumDownloadButton from './ChromiumDownloadButton';
+
 import type {
   AppSettings,
   BrowserDownloadProgress,
@@ -264,14 +266,11 @@ export default function SettingsModal({
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <Button
-                      size="sm"
+                    <ChromiumDownloadButton
+                      downloading={downloading}
+                      onStart={onDownloadChromium}
                       variant={browsers.length === 0 ? 'primary' : 'secondary'}
-                      onPress={onDownloadChromium}
-                      isDisabled={downloading}
-                    >
-                      {downloading ? '下载中…' : '下载 Chromium'}
-                    </Button>
+                    />
                     {downloading ? (
                       <ProgressBar
                         aria-label="Chromium 下载进度"

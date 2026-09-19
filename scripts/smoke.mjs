@@ -171,21 +171,25 @@ async function tap(page, expr) {
 
 /**
  * 清空并输入。三击选中在受控 Input 上不可靠（选中没生效时会把新串拼到旧串后面），
- * 改用 focus + Ctrl+A + Backspace，输入后回读校验实际值。
+ * 改用 focus + Ctrl+A + Backspace，输入后回读校验；不匹配就重试——弹窗挂载动画期间
+ * 键入会整批丢失（实测留下空输入框，「保存」被 if (!trimmed) return 挡回、弹窗不关，
+ * 后续断言全被遮罩吃掉）。
  */
 async function typeInto(page, selector, text) {
   const ready = await soft(`等待输入框 ${selector}`, () => page.waitForSelector(selector, { visible: true, timeout: 10_000 }));
   if (!ready) return null;
-  await soft(`聚焦输入框 ${selector}`, () => page.focus(selector));
-  await page.keyboard.down('Control');
-  await page.keyboard.press('KeyA');
-  await page.keyboard.up('Control');
-  await page.keyboard.press('Backspace');
-  if (text) await soft(`键入 ${text}`, () => page.type(selector, text, { delay: 12 }));
-  const actual = await page.evaluate((s) => document.querySelector(s)?.value ?? null, selector);
-  if (text && actual !== text) {
-    log(`      [warn] ${selector} 实际值「${actual}」≠ 期望「${text}」`);
-    return actual;
+  let actual = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await soft(`聚焦输入框 ${selector}`, () => page.focus(selector));
+    await page.keyboard.down('Control');
+    await page.keyboard.press('KeyA');
+    await page.keyboard.up('Control');
+    await page.keyboard.press('Backspace');
+    if (text) await soft(`键入 ${text}`, () => page.type(selector, text, { delay: 12 }));
+    actual = await page.evaluate((s) => document.querySelector(s)?.value ?? null, selector);
+    if (!text || actual === text) return actual;
+    log(`      [warn] ${selector} 第 ${attempt} 次输入未生效（实际「${actual}」），重试`);
+    await sleep(400);
   }
   return actual;
 }
@@ -748,20 +752,27 @@ async function runAppSection() {
     const openedSave = await tap(page, locator('button', '另存为模板'));
     if (openedSave) {
       await waitTrue('等另存弹窗打开', `document.body.innerText.includes('模板名称')`);
-      await typeInto(page, 'input[placeholder^="如：我的首页排版"]', '冒烟模板');
-      await tap(page, locator('button', '保存'));
-      await waitTrue('等另存弹窗关闭', noDialog);
-      const list = await api('templatesGet');
-      check('另存为模板写入存储', list.length === 1 && list[0].name === '冒烟模板', list.map((t) => `${t.id}/${t.name}`).join(','));
-      // 画廊在「模板」页签，另存后仍停在「样式」页签，需切过去才看得到自定义项
-      await tap(page, locator('[role="tab"]', '模板'));
-      await waitTrue('等自定义项进画廊', `document.body.innerText.includes('冒烟模板')`);
-      check('自定义模板出现在画廊', (await bodyText(page)).includes('冒烟模板'));
-      const tappedDelete = await tap(page, attrLocator('aside button', 'aria-label', '删除模板'));
-      await waitTrue('等画廊回到空态', `document.body.innerText.includes('还没有自定义模板')`);
-      const rest = await api('templatesGet');
-      check('删除自定义模板', tappedDelete && rest.length === 0, `点击=${tappedDelete} 剩余 ${rest.length}`);
-      check('删空后画廊回到空态', (await bodyText(page)).includes('还没有自定义模板'));
+      const typed = await typeInto(page, 'input[placeholder^="如：我的首页排版"]', '冒烟模板');
+      if (typed !== '冒烟模板') {
+        // 名称没落进输入框就别点保存（空名会被挡回、弹窗不关，会把后面整段断言全拖崩）
+        check('另存为模板写入存储', false, `模板名未写入（实际「${typed}」），已跳过后续避免连锁`);
+        await tap(page, locator('button', '取消'));
+        await waitTrue('等另存弹窗关闭', noDialog);
+      } else {
+        await tap(page, locator('button', '保存'));
+        await waitTrue('等另存弹窗关闭', noDialog);
+        const list = await api('templatesGet');
+        check('另存为模板写入存储', list.length === 1 && list[0].name === '冒烟模板', list.map((t) => `${t.id}/${t.name}`).join(','));
+        // 画廊在「模板」页签，另存后仍停在「样式」页签，需切过去才看得到自定义项
+        await tap(page, locator('[role="tab"]', '模板'));
+        await waitTrue('等自定义项进画廊', `document.body.innerText.includes('冒烟模板')`);
+        check('自定义模板出现在画廊', (await bodyText(page)).includes('冒烟模板'));
+        const tappedDelete = await tap(page, attrLocator('aside button', 'aria-label', '删除模板'));
+        await waitTrue('等画廊回到空态', `document.body.innerText.includes('还没有自定义模板')`);
+        const rest = await api('templatesGet');
+        check('删除自定义模板', tappedDelete && rest.length === 0, `点击=${tappedDelete} 剩余 ${rest.length}`);
+        check('删空后画廊回到空态', (await bodyText(page)).includes('还没有自定义模板'));
+      }
     } else {
       check('另存为模板写入存储', false, '未找到「另存为模板」按钮');
     }
@@ -775,6 +786,20 @@ async function runAppSection() {
         .filter((t) => ['浏览器', '默认值', '缓存', '关于'].includes(t))
     );
     check('设置弹窗含浏览器/默认值/缓存/关于四页签', modalTabs.length === 4, modalTabs.join(','));
+
+    // 下载 Chromium 是两段式确认（一旦开始无法中断），冒烟只验确认态、绝不真的开始下载
+    await tap(page, locator('[role="tab"]', '浏览器'));
+    await waitTrue('切到浏览器页签', `[...document.querySelectorAll('.modal__dialog [role="tab"]')].some((t) => t.textContent.trim() === '浏览器' && (t.getAttribute('aria-selected') === 'true' || t.dataset.selected === 'true'))`);
+    await tap(page, locator('button', '下载 Chromium'));
+    await waitTrue('等确认态出现', `document.body.innerText.includes('确认下载')`);
+    check(
+      '下载 Chromium 需二次确认且未直接开始',
+      (await bodyText(page)).includes('无法中途取消') && !(await bodyText(page)).includes('下载中…')
+    );
+    await tap(page, locator('button', '取消'));
+    await waitTrue('确认态收回', `!document.body.innerText.includes('确认下载')`);
+    check('取消回到未确认态', (await bodyText(page)).includes('下载 Chromium') && !(await bodyText(page)).includes('确认下载'));
+
     await tap(page, locator('[role="tab"]', '缓存'));
     await waitTrue('等缓存统计出数', `/(\\d+) 个文件/.test(document.body.innerText)`);
     const cacheFiles = await page.evaluate(() => document.body.innerText.match(/(\d+) 个文件/)?.[1] ?? null);

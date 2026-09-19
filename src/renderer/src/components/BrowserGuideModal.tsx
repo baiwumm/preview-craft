@@ -1,6 +1,8 @@
 import { Button, Modal, ProgressBar } from '@heroui/react';
 import type { ReactElement } from 'react';
 
+import ChromiumDownloadButton from './ChromiumDownloadButton';
+
 import { formatBytes } from '@/lib/format';
 
 import type { BrowserDownloadProgress, BrowserInfo } from '@shared/types';
@@ -84,9 +86,7 @@ export default function BrowserGuideModal({
               <Button variant="secondary" onPress={onOpenSettings}>
                 指定浏览器路径
               </Button>
-              <Button variant="primary" onPress={onDownload} isDisabled={downloading}>
-                {downloading ? '下载中…' : '下载 Chromium'}
-              </Button>
+              <ChromiumDownloadButton downloading={downloading} onStart={onDownload} variant="primary" />
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
