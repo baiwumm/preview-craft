@@ -1,15 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="PreviewCraft">
   <defs>
-    <linearGradient id="tile" x1="0.12" y1="0" x2="0.72" y2="1">
-      <stop offset="0" stop-color="#F1ECFF"/>
-      <stop offset="0.55" stop-color="#CFC3F8"/>
-      <stop offset="1" stop-color="#A797EC"/>
-    </linearGradient>
-    <radialGradient id="sheen" cx="0.28" cy="0.16" r="0.85">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-
     <!-- 显示器：挖出屏幕，并在手机前方让出一圈间隙（遮挡关系靠留白表达，不靠描边） -->
     <mask id="monitor" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
       <rect width="512" height="512" fill="#fff"/>
@@ -18,13 +8,13 @@
     </mask>
   </defs>
 
-  <rect width="512" height="512" rx="112" fill="url(#tile)"/>
-  <rect width="512" height="512" rx="112" fill="url(#sheen)"/>
+  <!-- 白底 + 极淡描边：纯白图标在浅色资源管理器/任务栏上会糊成一片，靠这圈描边保住轮廓 -->
+  <rect x="3" y="3" width="506" height="506" rx="110" fill="#FFFFFF" stroke="#E7E7EE" stroke-width="6"/>
 
-  <g fill="#171720" mask="url(#monitor)">
+  <g fill="#111114" mask="url(#monitor)">
     <rect x="100" y="100" width="272" height="184" rx="22"/>
     <rect x="216" y="284" width="40" height="36"/>
     <rect x="164" y="320" width="136" height="16" rx="8"/>
   </g>
-  <rect x="316" y="248" width="96" height="164" rx="22" fill="#171720"/>
+  <rect x="316" y="248" width="96" height="164" rx="22" fill="#111114"/>
 </svg>
