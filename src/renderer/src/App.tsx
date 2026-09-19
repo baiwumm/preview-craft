@@ -14,7 +14,7 @@ import { useShortcuts } from '@/hooks/useShortcuts';
 import { useTheme } from '@/hooks/useTheme';
 import { cloneTemplate, defaultStyle, isTemplateModified, type StyleState } from '@/lib/design';
 import { describeCaptureError } from '@/lib/format';
-import { devicePresets } from '@shared/devices';
+import { deviceIds, devicePresets } from '@shared/devices';
 import { presets } from '@templates/presets';
 import type {
   AppSettings,
@@ -134,10 +134,16 @@ export default function App(): ReactElement {
 
   const handleApply = useCallback(
     (nextMain: string, nextDeviceUrls: Partial<Record<DeviceId, string>>) => {
+      // 仅在地址真的变了时清掉失败占位：UrlBar 失焦也会提交同值，无条件清会让
+      // 「重试」入口在截图失败后凭空消失，而改地址后又残留上一轮的失败块。
+      const changed =
+        nextMain !== mainUrl ||
+        deviceIds.some((device) => (nextDeviceUrls[device] ?? '') !== (deviceUrls[device] ?? ''));
       setMainUrl(nextMain);
       setDeviceUrls(nextDeviceUrls);
+      if (changed) setShotErrors({});
     },
-    []
+    [mainUrl, deviceUrls]
   );
 
   const handleSelectTemplate = useCallback((template: Template) => {
