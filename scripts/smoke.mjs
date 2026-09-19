@@ -218,6 +218,7 @@ async function runLogicSection() {
   const { backgrounds, resolveBackgroundCss, isTransparentBackground } = await import('../src/renderer/templates/backgrounds.ts');
   const { defaultStyle, cloneTemplate, isTemplateModified, buildCustomBackground } = await import('../src/renderer/src/lib/design.ts');
   const { describeCaptureError, formatBytes, describeBrowserKind } = await import('../src/renderer/src/lib/format.ts');
+  const { compareVersions } = await import('../src/shared/version.ts');
 
   check('normalizeUrl 无协议时补 https', normalizeUrl('github.com') === 'https://github.com/', String(normalizeUrl('github.com')));
   check('normalizeUrl 保留路径与哈希', normalizeUrl('https://a.b/c?d=1#e') === 'https://a.b/c?d=1#e');
@@ -298,6 +299,35 @@ async function runLogicSection() {
   check('错误归因·空值与超长兜底', describeCaptureError(undefined) === '截图失败' && describeCaptureError('x'.repeat(200)).endsWith('…'));
   check('浏览器种类中文名', describeBrowserKind('chrome') === 'Chrome' && describeBrowserKind('edge') === 'Edge');
   check('formatBytes 边界', formatBytes(0) === '0 B' && formatBytes(1023) === '1023 B' && /KB$/.test(formatBytes(2048)) && /MB$/.test(formatBytes(111 * 1024 * 1024)), `${formatBytes(0)}|${formatBytes(1023)}|${formatBytes(2048)}|${formatBytes(111 * 1024 * 1024)}`);
+
+  check(
+    'compareVersions 按段数字比较',
+    compareVersions('2.1.2', '2.1.1') === 1 &&
+      compareVersions('2.1.1', '2.1.2') === -1 &&
+      compareVersions('2.1.2', '2.1.2') === 0 &&
+      compareVersions('v2.2.0', '2.2.0') === 0 &&
+      compareVersions('2.10.0', '2.9.9') === 1 &&
+      compareVersions('2.1', '2.1.0') === 0
+  );
+
+  /* 内嵌判定：应用侧是 file://（对站点等于 null 源），故 SAMEORIGIN / 'self' 都算被拦 */
+  const { judgeEmbedding } = await import('../src/main/probe.ts');
+  const headers = (init) => new Headers(init);
+  check('判定 X-Frame-Options: DENY', judgeEmbedding(headers({ 'x-frame-options': 'deny' })).blocked === true);
+  check('判定 X-Frame-Options: SAMEORIGIN', judgeEmbedding(headers({ 'x-frame-options': 'SAMEORIGIN' })).blocked === true);
+  check(
+    '判定 CSP frame-ancestors: none',
+    judgeEmbedding(headers({ 'content-security-policy': "default-src 'self'; frame-ancestors 'none'" })).blocked === true
+  );
+  check(
+    '判定 CSP frame-ancestors: self 也算拦',
+    judgeEmbedding(headers({ 'content-security-policy': "frame-ancestors 'self'" })).blocked === true
+  );
+  check('判定 frame-ancestors * 放行', judgeEmbedding(headers({ 'content-security-policy': 'frame-ancestors *' })).blocked === false);
+  check(
+    '判定无相关响应头时放行且视为已探到',
+    judgeEmbedding(headers({ 'content-type': 'text/html' })).blocked === false && judgeEmbedding(headers({})).probed === true
+  );
 }
 
 /* ========================================================= B. 真实应用 E2E */
@@ -361,12 +391,15 @@ async function runAppSection() {
 
   const { devicePresets } = await import('../src/shared/devices.ts');
   const { presets } = await import('../src/renderer/templates/presets.ts');
+  const pkgVersion = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8')).version;
   const classic = presets.find((t) => t.id === 'classic');
   const editorial = presets.find((t) => t.id === 'editorial');
   const electronPath = EXE ? null : (await import('electron')).default;
   const bin = EXE || electronPath;
+  // 未打包时用 `electron .` 而非 `electron out/main/index.js`：后者把 app path 定到
+  // out/main/（那里没有 package.json），app.getVersion() 会退化成 Electron 版本号。
   const launchArgs = (debugPort) => [
-    ...(EXE ? [] : [join('out', 'main', 'index.js')]),
+    ...(EXE ? [] : ['.']),
     ...(debugPort ? [`--remote-debugging-port=${debugPort}`] : []),
     `--user-data-dir=${PROFILE_DIR}`
   ];
@@ -448,16 +481,16 @@ async function runAppSection() {
       await sleep(250);
       return Boolean(hit);
     };
-    const tabSelected = (name) =>
-      `[...document.querySelectorAll('aside [role="tab"]')].some((t) => t.textContent.trim() === ${JSON.stringify(name)} && (t.getAttribute('aria-selected') === 'true' || t.dataset.selected === 'true'))`;
+    const tabSelected = (name, scope = 'aside') =>
+      `[...document.querySelectorAll(${JSON.stringify(scope)} + ' [role="tab"]')].some((t) => t.textContent.trim() === ${JSON.stringify(name)} && (t.getAttribute('aria-selected') === 'true' || t.dataset.selected === 'true'))`;
     const noDialog = `![...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0)`;
 
     /* --- 1. bridge / 默认设置 / 浏览器检测 --- */
     const API_METHODS = [
-      'browserDetect', 'browserDownload', 'onBrowserDownloadProgress', 'captureStart', 'onCaptureProgress',
+      'browserDetect', 'browserDownload', 'onBrowserDownloadProgress', 'captureStart', 'previewProbe', 'onCaptureProgress',
       'exportCompose', 'exportSave', 'exportClipboard', 'onExportRender', 'onWebpConvert', 'exportReady',
-      'exportWebpResult', 'settingsGet', 'settingsSet', 'cacheStats', 'cacheClear', 'pickBrowserPath',
-      'clipboardReadText', 'shotDataUrl', 'templatesGet', 'templatesSave', 'templatesDelete'
+      'exportWebpResult', 'settingsGet', 'settingsSet', 'appVersion', 'cacheStats', 'cacheClear', 'pickBrowserPath',
+      'clipboardReadText', 'shotDataUrl', 'updateCheck', 'updateOpen', 'templatesGet', 'templatesSave', 'templatesDelete'
     ];
     const missing = await page.evaluate((names) => names.filter((n) => typeof window.api?.[n] !== 'function'), API_METHODS);
     check('preload bridge 全方法可用', missing.length === 0, missing.length ? `缺失 ${missing.join(',')}` : `${API_METHODS.length} 个方法齐备`);
@@ -487,6 +520,33 @@ async function runAppSection() {
     let state = await canvasState(page);
     check('主 URL 回车渲染 4 台预览 iframe', state.frames.length === 4, state.frames.map((f) => f.title).join(','));
     check('预览 iframe 指向主地址', state.frames.every((f) => f.src.includes('github.com')));
+
+    /* 3b. 内嵌可行性探测：判定逻辑在 A 段纯测；这里只验真实网络链路与占位渲染。
+       本机到 github.com 常要 10s 上下，探测失败时按「未探到」跳过严格断言，不算回归。 */
+    const probeBlockedSite = await soft('previewProbe 拒绝内嵌站点', () => api('previewProbe', SITE));
+    const siteProbed = probeBlockedSite?.probed === true;
+    check(
+      'previewProbe 对拒绝内嵌站点的判定',
+      !siteProbed || (probeBlockedSite.blocked === true && /X-Frame-Options|frame-ancestors/.test(probeBlockedSite.reason ?? '')),
+      siteProbed ? JSON.stringify(probeBlockedSite) : '探测未成功（网络），跳过判定'
+    );
+    const probeOpenSite = await soft('previewProbe 可内嵌站点', () => api('previewProbe', 'https://example.com'));
+    check(
+      'previewProbe 放行可内嵌站点',
+      probeOpenSite?.probed === false || probeOpenSite?.blocked === false,
+      JSON.stringify(probeOpenSite)
+    );
+
+    // 触发一次「刷新预览」，让渲染侧取到（可能刚重试成功的）探测结果
+    await tap(page, locator('button', '刷新预览'));
+    if (siteProbed && probeBlockedSite.blocked) {
+      check(
+        '被拦站点在画布上给出占位说明',
+        await waitTrue('等拦截占位出现', `document.body.innerText.includes('该站点禁止内嵌预览')`, undefined, 20_000)
+      );
+    } else {
+      log('      [skip] 站点未被探明，跳过画布占位说明断言');
+    }
 
     await tap(page, locator('span', '分设备 URL', false));
     await sleep(800);
@@ -709,12 +769,31 @@ async function runAppSection() {
     /* --- 8. UI：设置弹窗 / 主题 / 设置持久化 --- */
     await tap(page, locator('button', '设置'));
     await waitTrue('等设置弹窗打开', `[...document.querySelectorAll('.modal__dialog h2')].some((h) => h.textContent.trim() === '设置')`);
-    const modalTabs = await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim()).filter((t) => ['浏览器', '默认值', '缓存'].includes(t)));
-    check('设置弹窗含浏览器/默认值/缓存三页签', modalTabs.length === 3, modalTabs.join(','));
+    const modalTabs = await page.evaluate(() =>
+      [...document.querySelectorAll('[role="tab"]')]
+        .map((t) => t.textContent.trim())
+        .filter((t) => ['浏览器', '默认值', '缓存', '关于'].includes(t))
+    );
+    check('设置弹窗含浏览器/默认值/缓存/关于四页签', modalTabs.length === 4, modalTabs.join(','));
     await tap(page, locator('[role="tab"]', '缓存'));
     await waitTrue('等缓存统计出数', `/(\\d+) 个文件/.test(document.body.innerText)`);
     const cacheFiles = await page.evaluate(() => document.body.innerText.match(/(\d+) 个文件/)?.[1] ?? null);
     check('缓存页签显示临时产物统计', cacheFiles !== null && Number(cacheFiles) > 0, `${cacheFiles} 个文件`);
+    await tap(page, locator('[role="tab"]', '关于'));
+    await waitTrue('切到关于页签', tabSelected('关于', '.modal__dialog'));
+    check('关于页显示运行版本', (await bodyText(page)).includes(`PreviewCraft ${pkgVersion}`), pkgVersion);
+    const clickedCheckUpdate = await tap(page, locator('button', '检查更新'));
+    const updateSettled = await waitTrue(
+      '等检查结果落地',
+      `/已是最新版本|发现新版本|检查失败/.test(document.body.innerText)`,
+      undefined,
+      25_000
+    );
+    const updateLine = await page.evaluate(() =>
+      document.body.innerText.split('\n').find((l) => /已是最新版本|发现新版本|检查失败/.test(l))?.trim()
+    );
+    check('检查更新给出结果文案', clickedCheckUpdate && updateSettled && Boolean(updateLine), updateLine ?? '无结果文案');
+
     const tappedClose = await tap(page, locator('button', '关闭'));
     const closedByButton = tappedClose && (await waitTrue('等设置弹窗关闭', noDialog));
     check('设置弹窗「关闭」按钮可收', closedByButton, `点击=${tappedClose} 弹窗仍开=${await modalOpen()}`);
