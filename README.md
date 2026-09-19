@@ -20,10 +20,10 @@ PreviewCraft 是一个 Electron 桌面工具，面向需要展示「同一站点
 | 设备预设 | 电脑 1440×950 / 笔记本 1366×891 / 平板 768×1020 / 手机 390×840（含 iPad、iPhone UA 与移动端触摸标记），2x 视口截图 |
 | 等待策略 | `domcontentloaded` → 字体就绪 → iframe 全部 load + 2s → 图片全部 complete → 冻结动画 CSS → 双 rAF，再落屏 |
 | 模板系统 | 5 套预设（经典全家福 / 双屏聚焦 / 有序陈列 / 灵感错落 / 移动主角）+ 自定义模板另存、删除 |
-| 样式定制 | 6 块背景板与自定义渐变、画布圆角、设备阴影、整体缩放、每台设备 X / Y / 宽度 / 旋转 |
+| 样式定制 | 7 块背景板（含透明底，导出 PNG 保留 alpha、JPG 自动垫白）与自定义渐变、画布圆角、设备阴影、整体缩放、每台设备 X / Y / 宽度 / 旋转 |
 | 导出 | 隐藏窗口按 1x/2x/3x 合成 → PNG（无损）/ JPG（quality 90）/ WebP，保存对话框 + 自动复制到剪贴板 |
-| 预览 | 预览态用 iframe 实时渲染，截图态所见即所得；单台失败可在画布上单独重试 |
-| 体验 | 明暗主题、快捷键、设置与自定义模板持久化（electron-store）、错误中文归因 Toast |
+| 预览 | 预览态用 iframe 实时渲染，截图态所见即所得；站点禁止内嵌时给出说明占位，单台失败可在画布上单独重试 |
+| 体验 | 明暗主题、快捷键、设置与自定义模板持久化（electron-store）、错误中文归因 Toast、设置内「关于」页检查新版本并跳转下载 |
 
 ### 快捷键
 
@@ -87,12 +87,15 @@ src/
 │  ├─ browser.ts    # 浏览器检测 / Chromium 下载（含真实下载进度）
 │  ├─ capture.ts    # 截图引擎（puppeteer-core）+ 临时缓存统计与清理
 │  ├─ export.ts     # 隐藏窗口高分辨率合成导出
+│  ├─ probe.ts      # 预览内嵌可行性探测（读 X-Frame-Options / CSP frame-ancestors）
+│  ├─ update.ts     # 检查更新（比对 GitHub Releases 最新版本，只跳转不自动装）
 │  └─ store.ts      # electron-store（设置 / 自定义模板）
 ├─ preload/         # contextBridge，唯一 IPC 入口
 ├─ renderer/        # React 19 + HeroUI v3 + Tailwind v4
 │  ├─ src/components/  UrlBar / Canvas / DeviceFrame / TemplateGallery / StylePanel / ExportPanel / SettingsModal / BrowserGuideModal …
 │  └─ templates/       模板 schema、5 套预设、背景板
-└─ shared/          # 三层共用的类型契约、设备 preset、URL 规范化
+└─ shared/          # 三层共用的类型契约、设备 preset、URL 规范化、版本号比较
+scripts/smoke.mjs   # 常驻全量冒烟（纯逻辑 + 真实应用 CDP）
 docs/PLAN.md        # 开发计划与各阶段执行记录
 ```
 
@@ -105,16 +108,18 @@ docs/PLAN.md        # 开发计划与各阶段执行记录
 | 命名空间 | 通道 |
 | --- | --- |
 | browser | `browser:detect`、`browser:download`、事件 `browser:download:progress` |
-| capture | `capture:start`、事件 `capture:progress` |
+| capture | `capture:start`、`preview:probe`（内嵌可行性探测）、事件 `capture:progress` |
 | export | `export:compose`、`export:save`、`export:clipboard`、`export:render`、`export:ready`、`export:webp:convert` / `result` |
-| settings / templates | `settings:get`、`settings:set`、`templates:get`、`templates:save`、`templates:delete` |
+| settings / templates | `settings:get`、`settings:set`、`app:version`、`templates:get`、`templates:save`、`templates:delete` |
+| update | `update:check`（比对 GitHub Releases）、`update:open`（仅放行 github.com https 链接） |
 | 系统能力 | `cache:stats`、`cache:clear`、`dialog:pick-browser`、`clipboard:read-text`、`shot:dataurl` |
 
 截图与导出产物先写入 `%TEMP%\preview-craft`，可在「设置 → 缓存」一键清理。
 
 ## 已知限制
 
-- 带 `X-Frame-Options` / CSP `frame-ancestors` 的站点（如 GitHub）无法在**预览** iframe 中显示，属站点侧限制；**导出**走真实截图，不受影响。
+- 带 `X-Frame-Options` / CSP `frame-ancestors` 的站点（如 GitHub）无法在**预览** iframe 中显示，属站点侧限制；预览时该设备屏内会给出「该站点禁止内嵌预览」说明而不是留白，**导出**走真实截图，不受影响。
+- 检查更新只在「设置 → 关于」手动触发并跳转浏览器下载，不做应用内自动更新（不引入 electron-updater）。
 - 单页截图等待上限 30 秒；不做 fullPage 长截图、登录态截图、批量 URL。
 - 当前仅出 Windows NSIS 安装包；macOS / Linux 未配置分发。
 - 后续计划见 [docs/PLAN.md](docs/PLAN.md) 的 Backlog 一节。
