@@ -7,6 +7,8 @@
  * 用法：
  *   pnpm build && node scripts/smoke.mjs
  *   --only=logic|e2e   只跑一段
+ *   --exe=<path>       改打打包产物（如 release/win-unpacked/PreviewCraft.exe），
+ *                      用于验证 NSIS 版内链路；默认跑未打包的 out/
  *   --site=<url>       截图/导出站点（默认 https://github.com）
  *   --port=<n>         CDP 端口（默认 9344）
  *   --keep-profile     保留 .smoke-profile（默认每次删除，以便断言默认设置）
@@ -42,6 +44,7 @@ const flag = (name, fallback) => {
 const ONLY = flag('only', '');
 const SITE = flag('site', 'https://github.com');
 const PORT = Number(flag('port', 9344));
+const EXE = flag('exe', '');
 const KEEP_PROFILE = argv.includes('--keep-profile');
 
 const BAD_HOST = 'https://preview-craft-smoke-nonexistent.invalid';
@@ -304,7 +307,7 @@ function killStraySmokeInstances() {
   const psFile = join(OUT_DIR, 'kill-stray.ps1');
   writeFileSync(
     psFile,
-    "Get-CimInstance Win32_Process -Filter \"Name='electron.exe'\" | Where-Object { $_.CommandLine -like '*smoke-profile*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\n",
+    "Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('electron.exe','PreviewCraft.exe') -and $_.CommandLine -like '*smoke-profile*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\n",
     'utf8'
   );
   try {
@@ -345,10 +348,14 @@ async function connectMain(port) {
 }
 
 async function runAppSection() {
-  section(`B. 真实应用端到端（CDP，站点 ${SITE}）`);
+  section(`B. 真实应用端到端（CDP，站点 ${SITE}，目标 ${EXE || 'out/ 未打包产物'}）`);
 
-  if (!existsSync(join(ROOT, 'out', 'main', 'index.js'))) {
+  if (!EXE && !existsSync(join(ROOT, 'out', 'main', 'index.js'))) {
     check('构建产物存在', false, '缺少 out/main/index.js，请先 pnpm build');
+    return;
+  }
+  if (EXE && !existsSync(EXE)) {
+    check('指定的可执行文件存在', false, `找不到 ${EXE}`);
     return;
   }
 
@@ -356,7 +363,13 @@ async function runAppSection() {
   const { presets } = await import('../src/renderer/templates/presets.ts');
   const classic = presets.find((t) => t.id === 'classic');
   const editorial = presets.find((t) => t.id === 'editorial');
-  const electronPath = (await import('electron')).default;
+  const electronPath = EXE ? null : (await import('electron')).default;
+  const bin = EXE || electronPath;
+  const launchArgs = (debugPort) => [
+    ...(EXE ? [] : [join('out', 'main', 'index.js')]),
+    ...(debugPort ? [`--remote-debugging-port=${debugPort}`] : []),
+    `--user-data-dir=${PROFILE_DIR}`
+  ];
 
   const appData = process.env.APPDATA ? join(process.env.APPDATA, 'preview-craft') : null;
   const realSettings = appData && existsSync(join(appData, 'settings.json')) ? join(appData, 'settings.json') : null;
@@ -369,11 +382,9 @@ async function runAppSection() {
 
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(
-    electronPath,
-    [join('out', 'main', 'index.js'), `--remote-debugging-port=${PORT}`, `--user-data-dir=${PROFILE_DIR}`],
-    { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] }
-  );
+  const child = spawn(bin, launchArgs(PORT), {
+    cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe']
+  });
   child.stderr.on('data', (d) => {
     const s = d.toString().trim();
     if (s && !s.includes('DevTools')) log(`[electron] ${s}`);
@@ -405,6 +416,19 @@ async function runAppSection() {
     /** 弹窗是否仍在（HeroUI Modal 关闭后节点移除，按可见高度判断） */
     const modalOpen = () =>
       page.evaluate(() => [...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0));
+
+    /**
+     * 等某个 DOM 条件成立。打包版整体比 out/ 慢（asar 读取 + 真实 GPU 合成），
+     * 固定 sleep 会让点击落在页签/弹窗切换的中间态上，后续断言连锁失败。
+     */
+    const waitTrue = async (label, expr, arg, timeout = 10_000) => {
+      const hit = await soft(label, () => page.waitForFunction(expr, { timeout, polling: 200 }, arg));
+      await sleep(250);
+      return Boolean(hit);
+    };
+    const tabSelected = (name) =>
+      `[...document.querySelectorAll('aside [role="tab"]')].some((t) => t.textContent.trim() === ${JSON.stringify(name)} && (t.getAttribute('aria-selected') === 'true' || t.dataset.selected === 'true'))`;
+    const noDialog = `![...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0)`;
 
     /* --- 1. bridge / 默认设置 / 浏览器检测 --- */
     const API_METHODS = [
@@ -599,12 +623,12 @@ async function runAppSection() {
 
     /* --- 7. UI：模板切换 / 样式微调 / 另存自定义模板 --- */
     await tap(page, locator('[role="tab"]', '模板'));
-    await sleep(600);
+    await waitTrue('切到模板页签', tabSelected('模板'));
     const galleryCount = await page.evaluate(() => document.querySelectorAll('aside [role="button"]').length);
     check('模板画廊渲染 5 套预设', galleryCount === 5, `${galleryCount} 项`);
 
     await tap(page, locator('[role="button"]', '灵感错落', false));
-    await sleep(800);
+    await waitTrue('等旋转排版生效', `document.querySelectorAll('main [style*="rotate("]').length === 3`);
     state = await canvasState(page);
     check('切「灵感错落」后 3 台带旋转', state.rotated === 3, `rotate 节点 ${state.rotated}`);
     check('选中模板有 ring 高亮', (await page.evaluate(() => document.querySelectorAll('aside [role="button"].ring-2').length)) === 1);
@@ -612,12 +636,12 @@ async function runAppSection() {
     check('切模板后截图数量随 placements 变化', editorialImages === 3, `img ${editorialImages}/3`);
 
     await tap(page, locator('[role="button"]', '经典全家福', false));
-    await sleep(800);
+    await waitTrue('等无旋转排版生效', `document.querySelectorAll('main [style*="rotate("]').length === 0 && document.querySelectorAll('main img').length === 4`);
     state = await canvasState(page);
     check('切回「经典全家福」恢复 4 台无旋转', state.rotated === 0 && state.images.length === 4, `rotate=${state.rotated} img=${state.images.length}`);
 
     await tap(page, locator('[role="tab"]', '样式'));
-    await sleep(600);
+    await waitTrue('切到样式页签', tabSelected('样式'));
     const styleText = await bodyText(page);
     check('样式页含背景板与圆角/阴影控件', styleText.includes('背景') && styleText.includes('圆角') && styleText.includes('阴影'));
     // HeroUI v3 Slider 的可聚焦控件是 input[type=range]（wrapper 只有 role=group），
@@ -638,18 +662,18 @@ async function runAppSection() {
 
     const openedSave = await tap(page, locator('button', '另存为模板'));
     if (openedSave) {
-      await sleep(700);
+      await waitTrue('等另存弹窗打开', `document.body.innerText.includes('模板名称')`);
       await typeInto(page, 'input[placeholder^="如：我的首页排版"]', '冒烟模板');
       await tap(page, locator('button', '保存'));
-      await sleep(1200);
+      await waitTrue('等另存弹窗关闭', noDialog);
       const list = await api('templatesGet');
       check('另存为模板写入存储', list.length === 1 && list[0].name === '冒烟模板', list.map((t) => `${t.id}/${t.name}`).join(','));
       // 画廊在「模板」页签，另存后仍停在「样式」页签，需切过去才看得到自定义项
       await tap(page, locator('[role="tab"]', '模板'));
-      await sleep(700);
+      await waitTrue('等自定义项进画廊', `document.body.innerText.includes('冒烟模板')`);
       check('自定义模板出现在画廊', (await bodyText(page)).includes('冒烟模板'));
       const tappedDelete = await tap(page, attrLocator('aside button', 'aria-label', '删除模板'));
-      await sleep(1200);
+      await waitTrue('等画廊回到空态', `document.body.innerText.includes('还没有自定义模板')`);
       const rest = await api('templatesGet');
       check('删除自定义模板', tappedDelete && rest.length === 0, `点击=${tappedDelete} 剩余 ${rest.length}`);
       check('删空后画廊回到空态', (await bodyText(page)).includes('还没有自定义模板'));
@@ -659,31 +683,30 @@ async function runAppSection() {
 
     /* --- 8. UI：设置弹窗 / 主题 / 设置持久化 --- */
     await tap(page, locator('button', '设置'));
-    await sleep(900);
+    await waitTrue('等设置弹窗打开', `[...document.querySelectorAll('.modal__dialog h2')].some((h) => h.textContent.trim() === '设置')`);
     const modalTabs = await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim()).filter((t) => ['浏览器', '默认值', '缓存'].includes(t)));
     check('设置弹窗含浏览器/默认值/缓存三页签', modalTabs.length === 3, modalTabs.join(','));
     await tap(page, locator('[role="tab"]', '缓存'));
-    await sleep(1200);
+    await waitTrue('等缓存统计出数', `/(\\d+) 个文件/.test(document.body.innerText)`);
     const cacheFiles = await page.evaluate(() => document.body.innerText.match(/(\d+) 个文件/)?.[1] ?? null);
     check('缓存页签显示临时产物统计', cacheFiles !== null && Number(cacheFiles) > 0, `${cacheFiles} 个文件`);
     const tappedClose = await tap(page, locator('button', '关闭'));
-    await sleep(900);
-    const closedByButton = tappedClose && !(await modalOpen());
+    const closedByButton = tappedClose && (await waitTrue('等设置弹窗关闭', noDialog));
     check('设置弹窗「关闭」按钮可收', closedByButton, `点击=${tappedClose} 弹窗仍开=${await modalOpen()}`);
     if (!closedByButton) {
       await page.keyboard.press('Escape');
-      await sleep(900);
-      check('Esc 可收设置弹窗', !(await modalOpen()));
+      const escClosed = await waitTrue('等 Esc 收弹窗', noDialog);
+      check('Esc 可收设置弹窗', escClosed);
     }
 
     const themeBtn = attrLocator('button', 'aria-label', '切换明暗主题');
     await tap(page, themeBtn);
-    await sleep(800);
+    await waitTrue('等浅色类挂上', `document.documentElement.classList.contains('light') && document.documentElement.getAttribute('data-theme') === 'light'`);
     const isLight = await page.evaluate(() => document.documentElement.classList.contains('light') && document.documentElement.getAttribute('data-theme') === 'light');
     const themeSetting = await api('settingsGet');
     check('主题切换即时生效并落库', isLight && themeSetting.theme === 'light', `class=${isLight} settings=${themeSetting.theme}`);
     await tap(page, themeBtn);
-    await sleep(600);
+    await waitTrue('等回到暗色类', `document.documentElement.classList.contains('dark')`);
     check('主题切回暗色', (await api('settingsGet')).theme === 'dark');
 
     await api('settingsSet', { format: 'webp', scale: 3 });
@@ -720,7 +743,7 @@ async function runAppSection() {
 
     /* --- 10. UI 导出闭环（原生保存对话框为人工项，只断言到 temp 产物） --- */
     await tap(page, locator('[role="tab"]', '导出'));
-    await sleep(600);
+    await waitTrue('切到导出页签', tabSelected('导出'));
     const tempDir = join(process.env.TEMP, 'preview-craft');
     const before = existsSync(tempDir) ? new Set(await readdir(tempDir)) : new Set();
     check('导出页可点「导出」', await tap(page, locator('button', '导出')));
@@ -738,7 +761,7 @@ async function runAppSection() {
 
     /* --- 11. 单实例锁 --- */
     const second = await new Promise((resolve) => {
-      const proc = spawn(electronPath, [join('out', 'main', 'index.js'), `--user-data-dir=${PROFILE_DIR}`], { cwd: ROOT, stdio: 'ignore' });
+      const proc = spawn(bin, launchArgs(null), { cwd: ROOT, stdio: 'ignore' });
       const timer = setTimeout(() => resolve({ exited: false, code: null, proc }), 20_000);
       proc.once('exit', (code) => {
         clearTimeout(timer);
