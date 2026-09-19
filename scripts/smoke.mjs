@@ -170,6 +170,32 @@ async function tap(page, expr) {
 }
 
 /**
+ * 把窗口拉到系统前台。React Aria 会把「夺焦后的第一下点击」用于聚焦窗口本身而不派发
+ * onPress，键入也会落空 —— 冒烟跑在你还在用鼠标的桌面上时，这会让一处交互失败并
+ * 引发整段连锁，所以每段 UI 交互前显式前置一次。
+ */
+async function focusAppWindow(page) {
+  await soft('窗口置前', () => page.bringToFront());
+  await page.evaluate(() => window.focus());
+  await sleep(250);
+}
+
+/** 用 Esc 清场：键盘事件经 CDP 直达渲染进程，不受系统焦点影响，比点「取消」可靠 */
+async function closeAllDialogs(page) {
+  for (let i = 0; i < 3; i++) {
+    const open = await page.evaluate(
+      () => [...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0)
+    );
+    if (!open) return true;
+    await page.keyboard.press('Escape');
+    await sleep(500);
+  }
+  return page.evaluate(
+    () => ![...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0)
+  );
+}
+
+/**
  * 清空并输入。三击选中在受控 Input 上不可靠（选中没生效时会把新串拼到旧串后面），
  * 改用 focus + Ctrl+A + Backspace，输入后回读校验；不匹配就重试——弹窗挂载动画期间
  * 键入会整批丢失（实测留下空输入框，「保存」被 if (!trimmed) return 挡回、弹窗不关，
@@ -180,6 +206,7 @@ async function typeInto(page, selector, text) {
   if (!ready) return null;
   let actual = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
+    await focusAppWindow(page);
     await soft(`聚焦输入框 ${selector}`, () => page.focus(selector));
     await page.keyboard.down('Control');
     await page.keyboard.press('KeyA');
@@ -332,6 +359,16 @@ async function runLogicSection() {
     '判定无相关响应头时放行且视为已探到',
     judgeEmbedding(headers({ 'content-type': 'text/html' })).blocked === false && judgeEmbedding(headers({})).probed === true
   );
+
+  /* 应用图标必须是带 alpha 的 RGBA：曾用 Chrome 截图生成图标时漏了 omitBackground，
+     产物退化成 RGB，圆角外变成不透明白底，任务栏与缩略图就带出一圈白方块。 */
+  const iconBuf = await readFile(join(ROOT, 'resources', 'icon.png'));
+  const iconPng = iconBuf[0] === 0x89 && iconBuf[1] === 0x50;
+  check(
+    '应用图标为 512×512 带 alpha 的 RGBA',
+    iconPng && iconBuf.readUInt8(24) === 8 && iconBuf.readUInt8(25) === 6 && pngDims(iconBuf).width === 512 && pngDims(iconBuf).height === 512,
+    `colorType=${iconBuf.readUInt8(25)}（6=RGBA）bitDepth=${iconBuf.readUInt8(24)} ${pngDims(iconBuf).width}x${pngDims(iconBuf).height}`
+  );
 }
 
 /* ========================================================= B. 真实应用 E2E */
@@ -402,8 +439,18 @@ async function runAppSection() {
   const bin = EXE || electronPath;
   // 未打包时用 `electron .` 而非 `electron out/main/index.js`：后者把 app path 定到
   // out/main/（那里没有 package.json），app.getVersion() 会退化成 Electron 版本号。
+  //
+  // 三个反节流开关是必需的：冒烟跑在你还在用鼠标的桌面上，窗口会被判为 occluded /
+  // 后台，Chromium 节流 rAF 后 HeroUI 弹窗的退场动画永不结束 —— 节点不卸载，遮罩
+  // 还在，后续每次点击都被吞掉，一处失败就连锁十几条（曾误判为应用缺陷）。
+  const ANTI_THROTTLE = [
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-background-timer-throttling'
+  ];
   const launchArgs = (debugPort) => [
     ...(EXE ? [] : ['.']),
+    ...ANTI_THROTTLE,
     ...(debugPort ? [`--remote-debugging-port=${debugPort}`] : []),
     `--user-data-dir=${PROFILE_DIR}`
   ];
@@ -695,7 +742,7 @@ async function runAppSection() {
     /* --- 6. UI：Ctrl+Enter 截图 → 画布换成真实截图 --- */
     // 窗口被遮挡时 Chromium 会节流 rAF，弹窗退场与页签切换可能卡在中间态；
     // 曾导致一次「保存后弹窗未关」的偶发失败，UI 阶段前显式拉到前台。
-    await page.bringToFront();
+    await focusAppWindow(page);
     await page.evaluate(() => document.activeElement?.blur?.());
     await page.keyboard.down('Control');
     await page.keyboard.press('Enter');
@@ -711,6 +758,7 @@ async function runAppSection() {
     check('截图 alt 标出设备名', state.images.length === 4 && state.images.every((a) => a.endsWith('截图')), state.images.join(','));
 
     /* --- 7. UI：模板切换 / 样式微调 / 另存自定义模板 --- */
+    await focusAppWindow(page);
     await tap(page, locator('[role="tab"]', '模板'));
     await waitTrue('切到模板页签', tabSelected('模板'));
     const galleryCount = await page.evaluate(() => document.querySelectorAll('aside [role="button"]').length);
@@ -756,8 +804,7 @@ async function runAppSection() {
       if (typed !== '冒烟模板') {
         // 名称没落进输入框就别点保存（空名会被挡回、弹窗不关，会把后面整段断言全拖崩）
         check('另存为模板写入存储', false, `模板名未写入（实际「${typed}」），已跳过后续避免连锁`);
-        await tap(page, locator('button', '取消'));
-        await waitTrue('等另存弹窗关闭', noDialog);
+        await closeAllDialogs(page);
       } else {
         await tap(page, locator('button', '保存'));
         await waitTrue('等另存弹窗关闭', noDialog);
@@ -778,6 +825,8 @@ async function runAppSection() {
     }
 
     /* --- 8. UI：设置弹窗 / 主题 / 设置持久化 --- */
+    await closeAllDialogs(page);
+    await focusAppWindow(page);
     await tap(page, locator('button', '设置'));
     await waitTrue('等设置弹窗打开', `[...document.querySelectorAll('.modal__dialog h2')].some((h) => h.textContent.trim() === '设置')`);
     const modalTabs = await page.evaluate(() =>
@@ -871,6 +920,8 @@ async function runAppSection() {
     check('改地址后失败占位让位给新预览', state.frames.length === 4 && state.retry === 0, `iframe ${state.frames.length}/4，重试占位 ${state.retry}`);
 
     /* --- 10. UI 导出闭环（原生保存对话框为人工项，只断言到 temp 产物） --- */
+    await closeAllDialogs(page);
+    await focusAppWindow(page);
     await tap(page, locator('[role="tab"]', '导出'));
     await waitTrue('切到导出页签', tabSelected('导出'));
     const tempDir = join(process.env.TEMP, 'preview-craft');
