@@ -181,6 +181,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 - [x] P3 模板系统
 - [x] P4 导出闭环
 - [x] P5 打磨与分发（2026-09-19 完成：打包 / 安装 / 全流程 / 卸载实测通过；「保存对话框落盘 + NSIS 中文安装界面」目视与「卸载是否清数据」口径待用户确认，见「六、待确认」）
+- [x] 回归冒烟基线（2026-09-19：`scripts/smoke.mjs` 常驻，98/98 PASS，见「五、执行记录」）
 
 ## 五、执行记录
 
@@ -198,16 +199,18 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 2026-09-19 | 反馈修复（v2.1.0） | **安装实测后用户反馈 6+2 项全部修复**：① 单实例锁 `requestSingleInstanceLock`，重复启动聚焦已有窗口（实测第二实例即刻退出）；② 设备壳弃用 PNG 改**纯 CSS 绘制**（几何数据化进 `shared/devices.ts`，DeviceShell 组件渲染机身/支架/底座/刘海/摄像头，内屏内容统一进 overflow-hidden 裁剪层）——圆角精确贴合解决「笔记本/手机圆角漏底色」，2x/3x 导出锐利且不再嵌图，4 张壳图与 `@frames` 别名删除；③ 新增「透明」背景板：预览铺棋盘格，导出窗口 `transparent:true` + 页面透明，**PNG 保留 alpha**（实测 colorType 6、四角 alpha=0、设备区不透明），JPG 自动垫白（`flattenWhite` 载荷）；④ 截图/导出任务遮罩上移覆盖画布 + 右侧面板，交互全锁定，顶栏「刷新预览/截图/设置」随任务禁用；⑤ 模板画廊改单列（缩略图 0.3）；分设备 URL 区收进卡片容器；侧栏页签改分段器样式；⑥ 模板修正：经典全家福左移 35px 居中（包围盒 65~1055）、有序陈列左移 40px 手机完整入画（原溢出画布 15px）。**自验**：typecheck/lint/build 三绿；CDP 驱动 9 项断言全过（含透明 PNG alpha 逐像素解析、单实例、遮罩存在性）；JPG 环节教训：React Aria Select 需真实指针事件，`element.click()` 打不开下拉 → 换 `page.mouse.click` 坐标点击后经 UI 切格式成功导出 JPEG（magic ffd8）。版本 2.1.0，四个提交（1c109dc / b075ec5 / 54d7236 / 1dfb7ae） | 无遗留；人工确认项同上不变
 | 2026-09-19 | 样式微调（v2.1.0 续） | 用户手工调整入库（页签全默认、导出/样式面板按钮并排、说明文字改 Description，a56f96b）；渐变起止色 ColorField 增加实时 ColorSwatch 色板前缀（a2de5dc，官方 Prefix 复合写法，CDP 截图核验）；侧栏页签先加分段器后按用户要求还原默认（2702570）。**版本更新提示功能确认本期不做**，轻量 / 完整两档方案记入「七、Backlog」待后续选型。typecheck / lint / build 三绿，安装包重新产出（02:18） | —
 | 2026-09-19 | 卸载口径定夺（v2.1.1） | 用户定夺「**卸载即清空**」：`deleteAppDataOnUninstall` 改 `true`，卸载时连同 `%APPDATA%\preview-craft`（设置、自定义模板、缓存）一并删除；曾考虑卸载时弹窗由用户选择（`customUnInstall` 自定义 NSIS 宏方案，已验证模板钩子存在），按「不用搞那么复杂」取消，脚本未入库。版本升 2.1.1 并重出安装包 | 明日视情况调整；注意 2.1.1 起卸载即清数据，覆盖安装不受影响
+| 2026-09-19 | 回归冒烟基线（**98/98 PASS**） | 各阶段自验脚本在 P5 按约定清理后仓库无可重跑回归，本次建为**常驻资产** `scripts/smoke.mjs`（配 `pnpm smoke` / `pnpm verify`）。**A 段 35 条纯逻辑**（Node 直跑 src 下 TS，零新依赖）：normalizeUrl 六类拒绝、viewport 高度按内屏比例换算公式、4 台 2x 尺寸表、UA/isMobile/hasTouch、内屏落在机身内、5 套预设 id 唯一 + **旋转外接盒越界检查**、背景 `custom:` / 透明 / 未知 key 解析、cloneTemplate 深拷贝与 isTemplateModified、错误归因 9 类、formatBytes。**B 段 63 条真实应用 CDP**（起 `out/` + `--user-data-dir=.smoke-profile` 隔离）：bridge 22 方法齐备、全新档案默认设置、浏览器检测命中本机 Chrome/Edge、非法 URL 中文提示、4 台预览 iframe、分设备覆盖与回落、captureStart 4/4 且逐台尺寸断言（2880×1900 / 2732×1782 / 1536×2040 / 780×1680）、capture:progress 4 pending 先行 + 4 done 收尾、shotDataUrl、导出 PNG/JPG/WebP × 1x/2x/3x（2240×1740 / 1120×870 / 3360×2610，魔数 + 页内解码尺寸）、**透明底 PNG colorType=6 且四角 alpha=0**、透明底 JPG 垫白、样式化导出（圆角/无阴影/zoom）、部分设备缺图仍可合成、剪贴板 ContainsImage=True、Ctrl+Enter 截图后 iframe 全换 img、模板切换 / 旋转 / ring 选中态、圆角 Slider 即时生效、另存与删除自定义模板 + 画廊空态回归、设置三页签与「关闭」按钮、主题双向切换并落库、格式/倍率持久化、不可达站点中文归因 + 4 台重试占位 + 单台重试、**改地址后失败占位让位给新预览**、UI 导出产出 temp 文件与进度遮罩、单实例锁拦截、**未污染用户真实设置（settings.json 哈希不变）**、cacheStats/cacheClear、无未捕获异常。导出产物与日志留在 `.smoke-out/`。**发现并修复应用缺陷 1 项**：截图失败后改地址，画布仍残留「重试」占位、预览回不来（实测 iframe=0、重试=4）→ `App.tsx` handleApply 改为仅在地址真变化时清 `shotErrors`（UrlBar 失焦会以同值二次提交，无条件清会抹掉重试入口）。工具链：`package.json` 加 `smoke` / `verify`，`.gitignore` 与 eslint ignores 同步补 `.smoke-out` / `.smoke-profile`。typecheck / lint 零错误 | ① 纯逻辑断言内嵌在冒烟脚本，未起 vitest（测试框架属依赖变更，见「六、待确认」6）；② 原生保存对话框仍不可自动化（P5 已判定为会话环境限制），UI 导出断言止于「temp 产物 + 进度遮罩」；③ 冒烟跑的是未打包 `out/`（dev 分支带 no-sandbox/disable-gpu），NSIS 安装版内的端到端未覆盖，需要时可加 `--dist` 模式指向 `release/win-unpacked`；④ 首轮 18 条 FAIL 全为脚本口径，教训已写进脚本注释：React Aria 组件需真实指针事件、HeroUI Slider 可聚焦控件是 `input[type=range]`（焦点留在页签上按方向键会切页签）、应用 CSP `connect-src` 不含 `data:`（页内解码图片用 `Image` 不用 `fetch`）、受控 Input 清空用 focus+Ctrl+A+Backspace（三击选中不可靠）
 
 ## 六、待确认
 
-截至 2026-09-19 晚，历史待确认项全部闭环，无阻塞开发的事项：
+截至 2026-09-19 晚，历史待确认项已闭环，仅剩 1 条新增（第 6 项，不阻塞开发）：
 
 1. **卸载数据口径**：✅ 已定夺「卸载即清空」—— 2.1.1 起 `deleteAppDataOnUninstall: true`，卸载时连 `%APPDATA%\preview-craft` 一并删除；覆盖安装不受影响。
 2. **安装界面与保存对话框目视确认**：✅ 用户已实际安装并使用应用（2026-09-19 反馈即来自真实使用），视为通过。
 3. **打包版 GPU/沙箱**：✅ 已解除疑虑（安装版启动正常），dev 的条件开关维持现状。
 4. **发布事务**（git tag / GitHub Release）：用户确认推后，下次会话视情况再定。
 5. **版本更新提示**：本期不做，方案记录在「七、Backlog」，需要时再选型。
+6. **纯逻辑单测要不要上 vitest**（2026-09-19 冒烟基线新增）：核心纯函数断言目前内嵌在 `scripts/smoke.mjs` A 段（Node 24 直跑 `src` 下 TS，零新依赖，`pnpm smoke` 一条命令）。是否再引入 vitest 换取 watch 模式、覆盖率报告与更细粒度的按模块单测，属**依赖变更**，按 AGENTS.md 第五节交用户定夺；不引入也能持续跑回归。
 
 ## 七、Backlog（后续迭代，均未开发）
 

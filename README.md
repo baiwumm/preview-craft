@@ -63,9 +63,16 @@ pnpm dev            # electron-vite 三层热更新，renderer 固定端口 5188
 pnpm typecheck      # tsc --noEmit（node + web 两套 tsconfig）
 pnpm lint           # eslint
 pnpm build          # 编译到 out/
+pnpm smoke          # 全量冒烟：纯逻辑断言 + 真实应用 CDP 端到端（需先 pnpm build）
+pnpm verify         # typecheck + lint + build + smoke 一条龙
 pnpm dist           # 打包 NSIS 安装包到 release/（首次运行见下方镜像说明）
 pnpm dist:dir       # 只出免安装目录 release/win-unpacked/，用于快速冒烟
 ```
+
+`pnpm smoke`（`scripts/smoke.mjs`）覆盖 URL 校验、设备几何、5 套预设越界检查、背景与样式解析、错误归因，
+以及起真实应用后的截图（4 台 2x 尺寸逐台断言）、导出（PNG/JPG/WebP × 1x/2x/3x、透明底 alpha、垫白）、
+剪贴板、模板 CRUD、设置与主题持久化、快捷键、失败重试与单实例锁。应用以 `--user-data-dir=.smoke-profile`
+隔离运行，不改写用户设置；导出产物与日志留在 `.smoke-out/` 供目检。
 
 > 打包注意：electron-builder 不读取 `.npmrc`。首次执行 `pnpm dist` 前需显式设置镜像环境变量，否则 NSIS 资源下载会超时：
 > `export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/`（PowerShell 用 `$env:` 逐个设置）。资源有缓存后无需重复设置。
