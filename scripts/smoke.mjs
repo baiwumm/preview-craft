@@ -420,9 +420,31 @@ async function runAppSection() {
     /**
      * 等某个 DOM 条件成立。打包版整体比 out/ 慢（asar 读取 + 真实 GPU 合成），
      * 固定 sleep 会让点击落在页签/弹窗切换的中间态上，后续断言连锁失败。
+     * 超时则转储现场（弹窗标题与输入值、活动页签、焦点元素），否则只能看到一串
+     * 由同一处卡点引发的连锁 FAIL。
      */
     const waitTrue = async (label, expr, arg, timeout = 10_000) => {
       const hit = await soft(label, () => page.waitForFunction(expr, { timeout, polling: 200 }, arg));
+      if (!hit) {
+        const scene = await page.evaluate(() => ({
+          dialogs: [...document.querySelectorAll('.modal__dialog')].map((el) => ({
+            heading: el.querySelector('h2')?.textContent?.trim(),
+            inputs: [...el.querySelectorAll('input')].map((i) => `${i.placeholder || i.type}=${i.value}`),
+            buttons: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean),
+            h: Math.round(el.getBoundingClientRect().height)
+          })),
+          activeTab: [...document.querySelectorAll('aside [role="tab"]')]
+            .find((t) => t.getAttribute('aria-selected') === 'true' || t.dataset.selected === 'true')?.textContent?.trim(),
+          focus: `${document.activeElement?.tagName}#${document.activeElement?.id || ''} ${(document.activeElement?.getAttribute('placeholder') || document.activeElement?.textContent || '').trim().slice(0, 24)}`,
+          topAtAside: (() => {
+            const el = document.elementFromPoint(window.innerWidth - 190, window.innerHeight / 2);
+            return el ? `${el.tagName}.${String(el.className).slice(0, 40)}` : null;
+          })(),
+          rotated: document.querySelectorAll('main [style*="rotate("]').length,
+          imgs: document.querySelectorAll('main img').length
+        }));
+        log(`      [scene] ${JSON.stringify(scene)}`);
+      }
       await sleep(250);
       return Boolean(hit);
     };
@@ -607,6 +629,9 @@ async function runAppSection() {
     }
 
     /* --- 6. UI：Ctrl+Enter 截图 → 画布换成真实截图 --- */
+    // 窗口被遮挡时 Chromium 会节流 rAF，弹窗退场与页签切换可能卡在中间态；
+    // 曾导致一次「保存后弹窗未关」的偶发失败，UI 阶段前显式拉到前台。
+    await page.bringToFront();
     await page.evaluate(() => document.activeElement?.blur?.());
     await page.keyboard.down('Control');
     await page.keyboard.press('Enter');
