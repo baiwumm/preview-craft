@@ -4,7 +4,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['out', 'dist', 'release', 'node_modules', 'scripts/**', '.agents/**'] },
+  { ignores: ['out', 'dist', 'release', 'node_modules', 'scripts/**', '.smoke-out/**', '.smoke-profile/**', '.agents/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

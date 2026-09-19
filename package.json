@@ -12,6 +12,8 @@
     "dist:dir": "electron-vite build && electron-builder --win --dir",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
+    "smoke": "node scripts/smoke.mjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm build && node scripts/smoke.mjs",
     "start": "electron-vite preview"
   },
   "dependencies": {
