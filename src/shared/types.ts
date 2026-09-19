@@ -89,11 +89,34 @@ export interface BrowserDownloadProgress {
   totalBytes?: number;
 }
 
+/** 预览 iframe 内嵌可行性探测结果（file:// 来源下读响应头判定） */
+export interface EmbedProbeResult {
+  /** 是否成功取到响应头；false 表示网络原因未探到，不代表站点允许内嵌 */
+  probed: boolean;
+  blocked: boolean;
+  /** 拦截依据，如 "X-Frame-Options: DENY" / "CSP frame-ancestors: 'none'" */
+  reason?: string;
+}
+
+/** 检查更新结果（只提示与跳转下载，不做应用内自动更新） */
+export interface UpdateCheckResult {
+  ok: boolean;
+  /** 当前版本（app.getVersion()） */
+  current: string;
+  latest?: string;
+  hasUpdate?: boolean;
+  /** 安装包或 Release 页链接，仅 https://github.com */
+  url?: string;
+  error?: string;
+}
+
 export interface Api {
   browserDetect(): Promise<{ found: BrowserInfo[]; active?: BrowserInfo }>;
   browserDownload(): Promise<{ path: string }>;
   onBrowserDownloadProgress(listener: (progress: BrowserDownloadProgress) => void): () => void;
   captureStart(input: CaptureStartInput): Promise<CaptureResult>;
+  /** 探测某地址能否被 iframe 内嵌（预览态占位提示用） */
+  previewProbe(url: string): Promise<EmbedProbeResult>;
   onCaptureProgress(listener: (progress: CaptureProgress) => void): () => void;
   exportCompose(input: ExportComposeInput): Promise<{ path: string }>;
   exportSave(input: { path: string; defaultName?: string }): Promise<{ saved: boolean }>;
@@ -105,6 +128,8 @@ export interface Api {
   exportWebpResult(data: ArrayBuffer): void;
   settingsGet(): Promise<AppSettings>;
   settingsSet(patch: Partial<AppSettings>): Promise<AppSettings>;
+  /** 运行中的版本号（app.getVersion()），「关于」页展示用 */
+  appVersion(): Promise<string>;
   /** 截图/导出临时缓存（temp/preview-craft）统计与清理 */
   cacheStats(): Promise<CacheStats>;
   cacheClear(): Promise<CacheStats>;
@@ -114,6 +139,10 @@ export interface Api {
   clipboardReadText(): Promise<string>;
   /** 读取截图文件转 dataURL（预览态 Canvas 显示用） */
   shotDataUrl(path: string): Promise<string>;
+  /** 检查 GitHub Releases 是否有新版本 */
+  updateCheck(): Promise<UpdateCheckResult>;
+  /** 用系统浏览器打开 Release / 下载链接（仅放行 github.com https） */
+  updateOpen(url: string): Promise<{ opened: boolean }>;
   templatesGet(): Promise<Template[]>;
   templatesSave(template: Template): Promise<Template[]>;
   templatesDelete(id: string): Promise<Template[]>;

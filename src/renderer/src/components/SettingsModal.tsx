@@ -1,5 +1,6 @@
 import {
   Button,
+  Description,
   Label,
   ListBox,
   Modal,
@@ -19,7 +20,8 @@ import type {
   BrowserInfo,
   CacheStats,
   ExportFormat,
-  Template
+  Template,
+  UpdateCheckResult
 } from '@shared/types';
 
 const NONE = 'none';
@@ -32,6 +34,8 @@ interface SettingsModalProps {
   browsers: BrowserInfo[];
   /** 供「默认模板」选择的完整模板列表 */
   templates: Template[];
+  /** 运行中的版本号，来自 app.getVersion() */
+  version: string;
   downloading: boolean;
   downloadProgress: BrowserDownloadProgress | null;
   downloadError: string | null;
@@ -39,6 +43,8 @@ interface SettingsModalProps {
   onPickBrowser: () => void;
   onDownloadChromium: () => void;
   onDetectBrowsers: () => void;
+  onCheckUpdate: () => Promise<UpdateCheckResult>;
+  onOpenRelease: (url: string) => void;
 }
 
 interface SelectOption<T extends string> {
@@ -95,16 +101,35 @@ export default function SettingsModal({
   settings,
   browsers,
   templates,
+  version,
   downloading,
   downloadProgress,
   downloadError,
   onPatch,
   onPickBrowser,
   onDownloadChromium,
-  onDetectBrowsers
+  onDetectBrowsers,
+  onCheckUpdate,
+  onOpenRelease
 }: SettingsModalProps): ReactElement {
   const [cache, setCache] = useState<CacheStats | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [update, setUpdate] = useState<UpdateCheckResult | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const handleCheckUpdate = useCallback(() => {
+    setChecking(true);
+    onCheckUpdate()
+      .then(setUpdate)
+      .catch((error: unknown) =>
+        setUpdate({
+          ok: false,
+          current: version,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      )
+      .finally(() => setChecking(false));
+  }, [onCheckUpdate, version]);
 
   const loadCache = useCallback(() => {
     window.api
@@ -168,6 +193,10 @@ export default function SettingsModal({
                     </Tabs.Tab>
                     <Tabs.Tab id="cache">
                       缓存
+                      <Tabs.Indicator />
+                    </Tabs.Tab>
+                    <Tabs.Tab id="about">
+                      关于
                       <Tabs.Indicator />
                     </Tabs.Tab>
                   </Tabs.List>
@@ -336,6 +365,50 @@ export default function SettingsModal({
                       刷新
                     </Button>
                   </div>
+                </Tabs.Panel>
+
+                <Tabs.Panel id="about" className="flex flex-col gap-3 pt-3">
+                  <div className="border-separator bg-surface/50 rounded-lg border p-3">
+                    <p className="text-foreground text-xs font-semibold">
+                      PreviewCraft {version || '—'}
+                    </p>
+                    <div className="text-muted mt-1">
+                      <Description>
+                        检查更新只比对 GitHub Releases 上的最新版本，确认后跳转浏览器下载安装包，
+                        应用内不自动安装。
+                      </Description>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      isDisabled={checking}
+                      onPress={handleCheckUpdate}
+                    >
+                      {checking ? '检查中…' : '检查更新'}
+                    </Button>
+                    {update?.ok && update.hasUpdate ? (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onPress={() => {
+                          if (update.url) onOpenRelease(update.url);
+                        }}
+                      >
+                        前往下载
+                      </Button>
+                    ) : null}
+                  </div>
+                  {update ? (
+                    <p className="text-foreground text-xs">
+                      {update.ok
+                        ? update.hasUpdate
+                          ? `发现新版本 ${update.latest}（当前 ${update.current}）`
+                          : `已是最新版本（${update.current}）`
+                        : `检查失败：${update.error ?? '未知错误'}`}
+                    </p>
+                  ) : null}
                 </Tabs.Panel>
               </Tabs>
             </Modal.Body>

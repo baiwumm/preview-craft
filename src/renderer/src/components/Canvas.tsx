@@ -1,4 +1,4 @@
-import type { DeviceId, Template } from '@shared/types';
+import type { DeviceId, EmbedProbeResult, Template } from '@shared/types';
 import type { ReactElement } from 'react';
 
 import { isTransparentBackground, resolveBackgroundCss, CHECKER_CSS } from '@templates/backgrounds';
@@ -19,6 +19,8 @@ interface CanvasProps {
   shots?: Partial<Record<DeviceId, string>>;
   /** 截图失败标记 */
   shotErrors?: Partial<Record<DeviceId, string | boolean>>;
+  /** 各地址的 iframe 内嵌可行性（预览态拦截提示用） */
+  embedHints?: Record<string, EmbedProbeResult>;
   /** 单台重试 */
   onRetry?: (device: DeviceId) => void;
   /** 导出态：透明底不铺棋盘格 */
@@ -39,6 +41,7 @@ export default function Canvas({
   fixedScale,
   shots,
   shotErrors,
+  embedHints,
   onRetry,
   exportMode,
   flattenWhite
@@ -73,17 +76,21 @@ export default function Canvas({
             transform: `scale(${total})`
           }}
         >
-          {template.placements.map((placement) => (
-            <DeviceFrame
-              key={placement.device}
-              placement={placement}
-              url={deviceUrls[placement.device] || mainUrl}
-              shadow={shadow}
-              shot={shots?.[placement.device]}
-              shotError={shotErrors?.[placement.device]}
-              onRetry={onRetry ? () => onRetry(placement.device) : undefined}
-            />
-          ))}
+          {template.placements.map((placement) => {
+            const url = deviceUrls[placement.device] || mainUrl;
+            return (
+              <DeviceFrame
+                key={placement.device}
+                placement={placement}
+                url={url}
+                shadow={shadow}
+                shot={shots?.[placement.device]}
+                shotError={shotErrors?.[placement.device]}
+                embedHint={embedHints?.[url]}
+                onRetry={onRetry ? () => onRetry(placement.device) : undefined}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

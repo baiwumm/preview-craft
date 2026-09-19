@@ -5,6 +5,8 @@ import { ClipboardItem, clipboard, dialog, BrowserWindow, app, ipcMain } from 'e
 import { detectBrowsers, ensureBrowser } from './browser';
 import { cacheClear, cacheStats, captureStart, closeBrowser } from './capture';
 import { exportCompose, shotToDataUrl } from './export';
+import { probeEmbedding } from './probe';
+import { checkForUpdate, openReleasePage } from './update';
 import {
   deleteCustomTemplate,
   getCustomTemplates,
@@ -72,9 +74,13 @@ function registerIpc(): void {
     });
   });
 
+  ipcMain.handle('preview:probe', (_event, url: string) => probeEmbedding(url));
+
   ipcMain.handle('settings:get', () => getSettings());
 
   ipcMain.handle('settings:set', (_event, patch) => setSettings(patch));
+
+  ipcMain.handle('app:version', () => app.getVersion());
 
   ipcMain.handle('cache:stats', () => cacheStats());
 
@@ -101,6 +107,10 @@ function registerIpc(): void {
   ipcMain.handle('templates:delete', (_event, id) => deleteCustomTemplate(id));
 
   ipcMain.handle('shot:dataurl', (_event, path: string) => shotToDataUrl(path));
+
+  ipcMain.handle('update:check', () => checkForUpdate());
+
+  ipcMain.handle('update:open', (_event, url: string) => openReleasePage(url));
 
   ipcMain.handle('export:compose', (_event, input) => exportCompose(input));
 

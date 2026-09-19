@@ -22,6 +22,7 @@ import type {
   BrowserInfo,
   CaptureResult,
   DeviceId,
+  EmbedProbeResult,
   Template
 } from '@shared/types';
 
@@ -66,6 +67,7 @@ export default function App(): ReactElement {
 
   // 设置（格式/倍率即时生效，默认模板与背景下次启动生效）
   const [settings, setSettings] = useState<AppSettings>(fallbackSettings);
+  const [appVersion, setAppVersion] = useState('');
 
   // 浏览器可用性
   const [browsers, setBrowsers] = useState<BrowserInfo[]>([]);
@@ -80,6 +82,8 @@ export default function App(): ReactElement {
   const [shots, setShots] = useState<Partial<Record<DeviceId, string>>>({});
   const [shotPaths, setShotPaths] = useState<Partial<Record<DeviceId, string>>>({});
   const [shotErrors, setShotErrors] = useState<Partial<Record<DeviceId, string>>>({});
+  // 预览内嵌可行性（键为地址）：被站点拦截时画布给说明占位，而不是留一片白
+  const [embedHints, setEmbedHints] = useState<Record<string, EmbedProbeResult>>({});
 
   const urlBarRef = useRef<UrlBarHandle>(null);
 
@@ -105,11 +109,13 @@ export default function App(): ReactElement {
   // 启动：设置 / 自定义模板 / 浏览器检测并行拉取
   useEffect(() => {
     const load = async (): Promise<void> => {
-      const [nextSettings, custom, detection] = await Promise.all([
+      const [nextSettings, custom, detection, version] = await Promise.all([
         window.api?.settingsGet().catch(() => null) ?? Promise.resolve(null),
         window.api?.templatesGet().catch(() => null) ?? Promise.resolve(null),
-        window.api?.browserDetect().catch(() => null) ?? Promise.resolve(null)
+        window.api?.browserDetect().catch(() => null) ?? Promise.resolve(null),
+        window.api?.appVersion().catch(() => '') ?? Promise.resolve('')
       ]);
+      setAppVersion(version);
 
       const customList = custom ?? [];
       setCustomTemplates(customList);
@@ -144,6 +150,40 @@ export default function App(): ReactElement {
       .catch(() => toast('设置保存失败', { variant: 'danger' }));
   }, []);
 
+  /**
+   * 探测这批地址能否被 iframe 内嵌。主进程按 URL 缓存判定结果、失败不缓存，
+   * 所以每次提交全量探一遍即可，渲染侧不必再去重。
+   */
+  const probeEmbedding = useCallback((urls: Array<string | undefined>) => {
+    const targets = [...new Set(urls.filter((url): url is string => Boolean(url)))];
+    if (!targets.length || !window.api) return;
+    void Promise.all(
+      targets.map(async (url) => [url, await window.api.previewProbe(url)] as const)
+    )
+      .then((entries) => {
+        setEmbedHints((prev) => {
+          const next = { ...prev };
+          for (const [url, result] of entries) next[url] = result;
+          return next;
+        });
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const checkUpdate = useCallback(async () => {
+    if (!window.api) throw new Error('当前环境未接入主进程');
+    return window.api.updateCheck();
+  }, []);
+
+  const openRelease = useCallback((url: string) => {
+    window.api
+      ?.updateOpen(url)
+      .then((result) => {
+        if (!result.opened) toast('只允许打开 GitHub 官方链接', { variant: 'warning' });
+      })
+      .catch(() => toast('打开链接失败', { variant: 'danger' }));
+  }, []);
+
   const handleApply = useCallback(
     (nextMain: string, nextDeviceUrls: Partial<Record<DeviceId, string>>) => {
       // 仅在地址真的变了时清掉失败占位：UrlBar 失焦也会提交同值，无条件清会让
@@ -154,8 +194,9 @@ export default function App(): ReactElement {
       setMainUrl(nextMain);
       setDeviceUrls(nextDeviceUrls);
       if (changed) setShotErrors({});
+      probeEmbedding([nextMain, ...Object.values(nextDeviceUrls)]);
     },
-    [mainUrl, deviceUrls]
+    [mainUrl, deviceUrls, probeEmbedding]
   );
 
   const handleSelectTemplate = useCallback((template: Template) => {
@@ -503,6 +544,7 @@ export default function App(): ReactElement {
             style={design.style}
             shots={shots}
             shotErrors={shotErrors}
+            embedHints={embedHints}
             onRetry={handleRetryDevice}
           />
         </main>
@@ -597,6 +639,7 @@ export default function App(): ReactElement {
         settings={settings}
         browsers={browsers}
         templates={[...presets, ...customTemplates]}
+        version={appVersion}
         downloading={downloading}
         downloadProgress={downloadProgress}
         downloadError={downloadError}
@@ -604,6 +647,8 @@ export default function App(): ReactElement {
         onPickBrowser={pickBrowserPath}
         onDownloadChromium={startChromiumDownload}
         onDetectBrowsers={detectBrowsers}
+        onCheckUpdate={checkUpdate}
+        onOpenRelease={openRelease}
       />
     </div>
   );

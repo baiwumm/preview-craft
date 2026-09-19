@@ -1,5 +1,5 @@
 import { devicePresets } from '@shared/devices';
-import type { Placement } from '@shared/types';
+import type { EmbedProbeResult, Placement } from '@shared/types';
 import type { CSSProperties, ReactElement } from 'react';
 
 import { Button } from '@heroui/react';
@@ -15,6 +15,8 @@ interface DeviceFrameProps {
   shot?: string;
   /** 该设备截图失败（true 或具体原因文案） */
   shotError?: string | boolean;
+  /** 站点禁止 iframe 内嵌时的说明（预览态用，避免白屏被当成程序故障） */
+  embedHint?: EmbedProbeResult;
   /** 单台重试回调 */
   onRetry?: () => void;
 }
@@ -30,6 +32,7 @@ export default function DeviceFrame({
   shadow,
   shot,
   shotError,
+  embedHint,
   onRetry
 }: DeviceFrameProps): ReactElement {
   const preset = devicePresets[placement.device];
@@ -86,20 +89,32 @@ export default function DeviceFrame({
             ) : null}
           </div>
         ) : url ? (
-          <iframe
-            src={url}
-            title={`${preset.label}预览`}
-            scrolling="no"
-            loading="lazy"
-            className="absolute border-0 bg-white"
-            style={{
-              width: preset.viewport.width,
-              height: preset.viewport.height,
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-              pointerEvents: 'none'
-            }}
-          />
+          <>
+            <iframe
+              src={url}
+              title={`${preset.label}预览`}
+              scrolling="no"
+              loading="lazy"
+              className="absolute border-0 bg-white"
+              style={{
+                width: preset.viewport.width,
+                height: preset.viewport.height,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+                pointerEvents: 'none'
+              }}
+            />
+            {embedHint?.blocked ? (
+              <div className="bg-background/95 absolute inset-0 flex flex-col items-center justify-center gap-1 px-2 text-center">
+                <span className="text-foreground text-[11px] leading-tight font-medium">
+                  该站点禁止内嵌预览
+                </span>
+                <span className="text-muted text-[10px] leading-tight">
+                  点「截图」查看真实效果
+                </span>
+              </div>
+            ) : null}
+          </>
         ) : null}
       </div>
     </div>
