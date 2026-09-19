@@ -102,7 +102,7 @@ export default function StylePanel({
         <div className="flex items-center gap-2">
           <ColorField
             aria-label="渐变起始色"
-            className="flex-1"
+            className="min-w-0 flex-1"
             value={toColor(style.customFrom)}
             onChange={(c) => {
               if (!c) return;
@@ -124,7 +124,7 @@ export default function StylePanel({
           </ColorField>
           <ColorField
             aria-label="渐变结束色"
-            className="flex-1"
+            className="min-w-0 flex-1"
             value={toColor(style.customTo)}
             onChange={(c) => {
               if (!c) return;

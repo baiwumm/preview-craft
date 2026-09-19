@@ -24,8 +24,8 @@ export const presets: Template[] = [
     canvas: { ...CANVAS_BASE },
     background: 'sea-salt',
     placements: [
-      { device: 'desktop', x: 175, y: 150, width: 790 },
-      { device: 'mobile', x: 820, y: 335, width: 175 }
+      { device: 'desktop', x: 160, y: 100, width: 760 },
+      { device: 'mobile', x: 790, y: 310, width: 170 }
     ]
   },
   {

@@ -13,7 +13,7 @@ import UrlBar, { type UrlBarHandle } from '@/components/UrlBar';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import { useTheme } from '@/hooks/useTheme';
 import { cloneTemplate, defaultStyle, isTemplateModified, type StyleState } from '@/lib/design';
-import { describeCaptureError } from '@/lib/format';
+import { describeBrowserKind, describeCaptureError } from '@/lib/format';
 import { deviceIds, devicePresets } from '@shared/devices';
 import { presets } from '@templates/presets';
 import type {
@@ -86,8 +86,20 @@ export default function App(): ReactElement {
   const detectBrowsers = useCallback(() => {
     window.api
       ?.browserDetect()
-      .then((result) => setBrowsers(result.found))
-      .catch(() => undefined);
+      .then((result) => {
+        setBrowsers(result.found);
+        const names = result.found.map((b) => describeBrowserKind(b.kind)).join('、');
+        toast(
+          result.found.length
+            ? `检测到 ${result.found.length} 个可用浏览器：${names}`
+            : '未检测到 Chrome / Edge',
+          {
+            variant: result.found.length ? 'success' : 'warning',
+            description: result.found.length ? undefined : '可下载 Chromium，或手动指定浏览器路径'
+          }
+        );
+      })
+      .catch(() => toast('浏览器检测失败', { variant: 'danger' }));
   }, []);
 
   // 启动：设置 / 自定义模板 / 浏览器检测并行拉取
