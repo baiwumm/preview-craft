@@ -32,6 +32,9 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#171720',
+    // 打包版的图标由 electron-builder 烤进 exe；未打包运行时若不显式给 icon，
+    // Windows 会退回 Electron 默认图标（dev 下「Logo 不对」的原因）。
+    ...(!app.isPackaged ? { icon: join(__dirname, '../../resources/icon.png') } : null),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
