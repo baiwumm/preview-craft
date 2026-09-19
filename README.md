@@ -41,11 +41,11 @@ PreviewCraft 是一个 Electron 桌面工具，面向需要展示「同一站点
 
 ## 安装
 
-1. 获取安装包 `PreviewCraft-Setup-<version>.exe`（自行构建方式见下节，产物在 `release/`）。
+1. 获取安装包 `PreviewCraft-Setup-<version>.exe`：从 [Releases](https://github.com/baiwumm/preview-craft/releases/latest) 下载，或自行构建（见下节，产物在 `release/`）。
 2. 双击安装：简体中文安装界面，可选择安装目录，自动创建桌面与开始菜单快捷方式。
 3. 首次使用若本机没有 Chrome / Edge，应用会弹出引导，一键下载 Chromium（约 150 MB，保存在应用数据目录，不改动系统浏览器、不写注册表）。
 
-卸载只清除程序与快捷方式，保留 `%APPDATA%\PreviewCraft` 中的设置与自定义模板。
+卸载会清除程序、快捷方式，并连同应用数据目录 `%APPDATA%\preview-craft`（设置与自定义模板）一并删除。
 
 ## 使用流程
 
