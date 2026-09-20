@@ -17,17 +17,13 @@
     "start": "electron-vite preview"
   },
   "dependencies": {
-    "@heroui/react": "^3.2.5",
-    "@heroui/styles": "^3.2.5",
     "@puppeteer/browsers": "^3.2.2",
-    "electron-store": "^11.0.2",
-    "puppeteer-core": "^25.11.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "tailwind-variants": "^3.3.1"
+    "puppeteer-core": "^25.11.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@heroui/react": "^3.2.5",
+    "@heroui/styles": "^3.2.5",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.1",
     "@types/react": "^19.3.0",
@@ -35,11 +31,15 @@
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.4.1",
     "electron-builder": "^26.15.3",
+    "electron-store": "^11.0.2",
     "electron-vite": "^5.0.0",
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.12.0",
     "lucide-react": "^1.47.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-variants": "^3.3.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
