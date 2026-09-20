@@ -36,7 +36,7 @@
 
 | device | viewport (css px) | UA 特征 | isMobile | hasTouch | 机身宽 | 机身宽高比 | 内屏 inner（机身内偏移） |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| desktop | 1440 × 950* | 桌面 Chrome UA | false | false | 620 | 620/548 | 600 × 396（10,10） |
+| desktop | 1440 × 950* | 桌面 Chrome UA | false | false | 620 | 620/478 | 600 × 396（10,10） |
 | laptop | 1366 × 891* | 桌面 Chrome UA | false | false | 520 | 520/304 | 408 × 266（56,12） |
 | tablet | 768 × 1020* | iPad UA | true | true | 300 | 300/396 | 280 × 372（10,12） |
 | mobile | 390 × 840* | iPhone UA | true | true | 138 | 138/279 | 124 × 267（7,6） |
@@ -44,6 +44,7 @@
 \* viewport 高度按「内屏宽高比」换算保证内容不变形：`height = round(width × innerH / innerW)`，实现时以此公式为准。
 内屏 `inner` 是设备壳上的透明展示区，截图 `<img>` 与预览 `<iframe>` 都缩放铺到这里：`scale = innerW / viewportW`。
 **数值以 `src/shared/devices.ts` 为准**；2.1.0 起设备壳改为纯 CSS 绘制（机身/支架/刘海等几何同样在该文件），旧版壳图 PNG 与 `git show 1.3.0:public/<device>.png` 的恢复路径已废弃、不再使用。
+2.2.0 起 desktop 机身改窄边框 + 细支架（外接高 548 → 478，支架颈 84×86 → 56×42、底座宽 304 → 148），mobile 增 `shell.island`（灵动岛，画在内屏裁剪层内、坐标与机身同基准）；`inner` 与 viewport 四台全未改动，截图链路零影响。
 
 ### 排版模板 schema 与 5 套预设
 
@@ -60,26 +61,34 @@ interface Template {
 
 ```ts
 export const presets: Template[] = [
-  { id: 'classic', name: '经典全家福', subtitle: '四种屏幕，一个好故事', placements: [
-    { device: 'desktop', x: 320, y: 140, width: 620 }, { device: 'laptop', x: 100, y: 420, width: 510 },
-    { device: 'tablet', x: 850, y: 290, width: 240 }, { device: 'mobile', x: 710, y: 465, width: 135 }] },
-  { id: 'duo', name: '双屏聚焦', subtitle: '桌面与移动，恰到好处', placements: [
-    { device: 'desktop', x: 175, y: 150, width: 790 }, { device: 'mobile', x: 820, y: 335, width: 175 }] },
-  { id: 'row', name: '有序陈列', subtitle: '清晰展示每一种尺寸', placements: [
-    { device: 'desktop', x: 65, y: 240, width: 390 }, { device: 'laptop', x: 455, y: 355, width: 335 },
-    { device: 'tablet', x: 805, y: 255, width: 180 }, { device: 'mobile', x: 1020, y: 320, width: 115 }] },
-  { id: 'editorial', name: '灵感错落', subtitle: '轻盈旋转，更有表达', placements: [
-    { device: 'laptop', x: 100, y: 255, width: 640, rotation: -8 },
-    { device: 'tablet', x: 810, y: 170, width: 240, rotation: 8 },
-    { device: 'mobile', x: 700, y: 455, width: 135, rotation: -8 }] },
-  { id: 'focus', name: '移动主角', subtitle: '为小屏幕留足舞台', placements: [
-    { device: 'tablet', x: 300, y: 130, width: 355 }, { device: 'mobile', x: 660, y: 260, width: 205 }] },
+  { id: 'classic', name: '经典全家福', subtitle: '四种屏幕，一个好故事', background: 'sunset-flare', placements: [
+    { device: 'desktop', x: 220, y: 70, width: 660 }, { device: 'laptop', x: 110, y: 505, width: 470 },
+    { device: 'tablet', x: 815, y: 300, width: 210 }, { device: 'mobile', x: 680, y: 498, width: 140 }] },
+  { id: 'duo', name: '双屏聚焦', subtitle: '桌面与移动，恰到好处', background: 'grape-soda', placements: [
+    { device: 'desktop', x: 155, y: 155, width: 700 }, { device: 'mobile', x: 785, y: 372, width: 170 }] },
+  { id: 'row', name: '有序陈列', subtitle: '清晰展示每一种尺寸', background: 'glacier', placements: [
+    { device: 'desktop', x: 92, y: 304, width: 340 }, { device: 'laptop', x: 454, y: 390.7, width: 300 },
+    { device: 'tablet', x: 776, y: 394.5, width: 130 }, { device: 'mobile', x: 928, y: 368, width: 98 }] },
+  { id: 'editorial', name: '灵感错落', subtitle: '轻盈旋转，更有表达', background: 'cotton-candy', placements: [
+    { device: 'laptop', x: 132, y: 230, width: 580, rotation: -8 },
+    { device: 'tablet', x: 764, y: 146, width: 225, rotation: 8 },
+    { device: 'mobile', x: 642, y: 453, width: 145, rotation: -10 }] },
+  { id: 'focus', name: '移动主角', subtitle: '为小屏幕留足舞台', background: 'obsidian', placements: [
+    { device: 'tablet', x: 205, y: 111.6, width: 490 }, { device: 'mobile', x: 630, y: 162, width: 295 }] },
 ];
 ```
 
+**构图口径（2.2.0 起固化，冒烟 A 段按同一组判据断言，改坐标即被校验）**：内容包围盒水平居中偏差 ≤10px、上下留白之差 ≤34px；左右留白 ≥88px（画布宽 8%）、上下 ≥60px；宽或高至少一轴占画布 ≥68%；`row` 四台底边同一地平线且相邻间隙等距；后景设备屏幕被前景压住的面积 ≤12%。
+
 ### 背景板
 
-`暮色紫 #ede6ff→#b5aff2`、`海盐蓝 #e4f5fb→#9ac6e4`、`薄荷绿 #e9f4df→#a4caba`、`奶油杏 #fff2df→#edc6b0`、`曜石黑 #3b3b49→#171720`、`纯白 #ffffff`。
+15 块分三组（`src/renderer/templates/backgrounds.ts`，2.2.0 重做）：
+
+- **渐变 7**：落日熔金 `#ff9a3d→#f42c7a→#7b2ff7`、珊瑚气泡、葡萄汽水、冰川蓝、青柠气泡、玫红夜幕、棉花糖 —— 一律 `135deg` 三段，上叠一层 `radial-gradient` 左上高光。
+- **纯色 5**：纯白 `#ffffff`、云灰 `#eef0f4`、淡靛 `#e2e7f4`、米砂 `#f4ece1`、透明。
+- **深色 3**：曜石黑 `#1f1f28→#0b0b10`、深海、乌木紫。
+
+每块带 `color` 代表色：样式页的背景板选择器用 HeroUI 内置 `ColorSwatchPicker`，它拿代表色的 hexa 当选中 key 并据此画描边，`value` 里的渐变只通过 `ColorSwatchPicker.Swatch` 的 `style` 透传显示。
 
 ### IPC 契约
 
@@ -184,6 +193,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 - [x] 回归冒烟基线（2026-09-20：`scripts/smoke.mjs` 常驻，源码态 **122/122 PASS、零 SKIP**；超时自动转储现场、窗口停帧即判红、网络探测不通的分支走 `skip()` 不再虚报 PASS，详见「五、执行记录」。**跑前必须 `pnpm build`**：`smoke` 脚本不含构建，仓库里的 `out/` 一旦落后于源码就会打出一串假 FAIL（2026-09-20 踩到：2.0.0 时代的 `out/` 缺 2.1.x 全部功能，10 条红）。安装版 `--exe` 模式的靶子是 `release/win-unpacked/`，随 `release/` 清理会不在盘上、需重跑 `pnpm dist` 才有（2026-09-20 出 2.1.4 包后已恢复，安装版同轮跑 **122/122 PASS**）
 - [x] 反馈迭代 2.1.0 ~ 2.1.3（线上发布版曾为 2.1.3：装机反馈 4 项修复 + 预览拦截占位 + 检查更新「关于」页 + Chromium 下载二次确认 + 图标重设计为白底黑标并补 alpha；tag `2.1.3` 与 GitHub Release 已发、安装包已核验字节数与 SHA256 与本地一致、已静默装到本机）
 - [x] 缺陷收口 2.1.4（**当前发布版 2.1.4**，2026-09-20：渲染→主进程边界收紧、截图引擎不再被一次启动失败锁死、换地址清掉对应设备旧截图、截图任务互斥 + 删死文件。四道门全过：出包 ✅ / 推 origin ✅ / tag + Release ✅ / 装机复验 ✅ —— 安装包匿名核验 116,566,272 字节与本地一致、Range 请求 206 且首两字节 `MZ`）
+- [x] 视觉迭代 2.2.0（2026-09-20 用户看图签字通过：背景板 7 → 15 块重做、五套预设按构图口径重排、阴影按显示宽分级、desktop 壳去粗支架 + mobile 灵动岛 + 机身轮廓光、缩略图对齐真机、背景板选择器换 HeroUI 内置 `ColorSwatchPicker`。门禁 typecheck / lint / build 零错误，冒烟 **132 条**（新增 9 条：构图光学判据 ×3、壳体几何 ×3、色板代表色 ×2、内置选择器交互 ×1 组）。**版本已升 2.2.0；代码按 feat / test / docs / chore 四个 commit 落库，出包 / 推 origin / tag+Release / 装机四道门均待放行**）
 - [ ] 下一步：Backlog 择机（长截图 / 登录态截图 / 批量队列 / OG 预设 / 托盘 / 导出历史），以及 16px 图标简化版与 Chromium 真取消（0.5~1 天）——用户 2026-09-20 定：功能清单先记在 §7，有空再做；§7「已报出、待排期」五项技术债同候
 
 ## 五、执行记录
@@ -214,6 +224,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 2026-09-20 | 缺陷收口（v2.1.4） | 用户拍「先修债、Backlog 往后延」，本轮只动已批准的四条真缺陷 + 文档纠偏，**不碰功能面**。**① 渲染→主进程边界**：主窗口挂 `setWindowOpenHandler` 一律 deny + `will-navigate` 只允许留在自身来源（设备屏里嵌的是任意远程站点，子帧 `window.open` 弹出的窗口按 Electron 规则继承 opener 的 webPreferences 含 preload，放行等于把整套 `window.api` 交给外部页面）；`capture:start` / `preview:probe` 在主进程侧过一遍 `normalizeUrl`（原先只有渲染侧校验，`file://` 与内网地址从这里出得去）；`shot:dataurl` / `export:save` / `export:clipboard` 的路径锁进 `shotCacheDir()`（`export.ts` 新增 `assertShotPath`，三条通道共用），`export:save` 的 `defaultName` 过 `basename` 防借它写出目录。**② 截图引擎生命周期**：`launchBrowser` 原先把 rejected promise 永久缓存 —— 一次 launch 失败（Chrome 被占用 / 崩掉）之后每次截图都返回同一个错误，只能重启应用；改为记 `{path, promise}`，失败即清缓存、挂 `disconnected` 断连即清、传入路径与缓存不同则关旧实例重开（顺带解决「设置里换了浏览器路径不生效」），`before-quit` 也把 `closeBrowser()` 从 fire-and-forget 改成带 2s 上限的等待，不再留孤儿 chrome.exe。**③ 换地址残留旧截图**：`handleApply` 原先只清 `shotErrors`，而 `DeviceFrame` 优先渲染 shot → 截完 A 站改成 B 站，画布仍是 A 的截图，此时直接导出会把 A 的图配上新排版且全程不报错（2.1.x 只修了失败分支，成功分支漏）。改为按「该台实际用的地址（自己的覆盖 \|\| 主地址）」精确清 `shots`/`shotPaths`/`shotErrors`，同值提交（失焦二次提交）仍是空集，不伤「重试」入口。**④ 截图并发**：单台重试不盖遮罩，`handleRetryDevice` 原先不查 `job` 也不挡连点 → 两条 `captureStart` 共用一个浏览器实例并发导航、后完成的覆盖先完成的；渲染侧加 `job` + 在途设备集合双护栏，主进程 `capture:start` 加在途标记（第二次直接抛「上一次截图还在进行中」），`UrlBar.submit` 在 `busy` 时直接返回（回车与失焦是三个已禁用按钮留下的旁路）。**⑤ 死文件与文档**：删 `renderer/templates/index.ts` + `devices.ts`（纯 re-export、全仓库零 importer，大家都直接引 `@shared/devices`）与随之悬空的 `getPresetById`；PLAN §2 设备表从 PNG 壳时代数值改为 CSS 壳实际值并标「数值以 `shared/devices.ts` 为准」（laptop 892→891、tablet 1022→1020、机身宽高比四列全换、删掉「壳图从 git 历史恢复」一句）；§7 Backlog 抬头「均未开发」纠正 —— 轻量档检查更新其实 2.1.3 已上线，同时把本轮评审发现但**未获批准动手**的项（导出 IPC 监听器泄漏、缓存只增不减、会话不落盘、`setState` 更新函数里发 IPC、`deviceScaleFactor:2` 语义、外网依赖的 2 条 SKIP）逐条记进去待排期。**冒烟新增 9 条断言**：四条越界输入被主进程挡下（缓存目录外读 ×2、非 http(s) ×2）、`window.open` 返回 null、launch 失败如实报错 + **失败后下一次截图仍成功**（真拿 `where.exe` 当浏览器触发失败，再改回自动检测截出图来）、并发 `captureStart` 被互斥挡下、改地址后 `img 0 / iframe 4`。**门禁**：typecheck / lint 零错误，`pnpm build` 通过，源码态全量 **122/122 PASS、零 SKIP**。**主动收窄的一处**：批准清单里的「iframe 加 `sandbox`」没做 —— `sandbox` 会向下传播给被预览页面自己内嵌的子帧且无法由子帧解除（视频/地图类嵌入组件会黑屏），为一张截图工具的渲染保真不值；顶层的 `setWindowOpenHandler` 已经关掉「外部页面拿到 bridge」这个真正的洞 | ① 本轮未做 `pnpm dist` / 推送 / tag / Release / 装机，四道门均待放行；② `release/` 已清空，`--exe` 打包版冒烟要等重新出包才有靶子；③ 环境性停帧仍只能「判红即定性」；④ 拦截占位两条断言依旧依赖外网（本轮网络争气，零 SKIP） |
 | 2026-09-20 | 2.1.4 发布四道门（**三道半过，Release 卡在凭据**） | **门 1 出包**：带 `ELECTRON_MIRROR` / `ELECTRON_BUILDER_BINARIES_MIRROR` 跑 `pnpm dist`（electron-builder 不读 `.npmrc`，不显式给就会卡在 NSIS 资源下载）→ `release/PreviewCraft-Setup-2.1.4.exe` **116,566,272 字节**（比 2.1.3 的 116,561,932 大 4,340 字节，与改动量同量级，无异常膨胀），SHA256 `60db7f7c2cf22862614d8e952088c31f9dcf4bd6bb3e486d049fbe8b7df48538`；**打包卫生复验**：`app.asar`（53.1MB）头里 `.smoke-out` / `.smoke-profile` 命中均 false，2.1.2 那次 +8.1MB 的坑没回退。**门 2 推送**：`git push origin main` `49966b0..884c243`，7 个提交（走 SSH，不受本机到 github.com HTML 端点超时影响）。**门 3 tag 完成、Release 未完成**：annotated tag `2.1.4` 已推 origin；但 `gh auth status` 报「未登录任何 host」，且 `%APPDATA%\GitHub\` 目录根本不存在、`GH_TOKEN`/`GITHUB_TOKEN` 均未设 —— **本机没有可用的 GitHub 凭据**，116MB 附件又超网页端约 25MB 上限，只能走 CLI/API，故 Release 待用户放行认证（说明稿已写到 `%TEMP%\pc-release-214.md`，含修复清单 + 字节数 + SHA256）。**门 4 装机复验通过**：装前确认 `NO_RUNNING_INSTANCE`（不顶掉用户正在用的窗口）→ `Setup-2.1.4.exe /S` 静默覆盖安装 exit=0 → exe `ProductVersion=2.1.4.0`、卸载项 `DisplayName=PreviewCraft 2.1.4 / DisplayVersion=2.1.4`（键名仍是 appId 派生 GUID `4cf14dc5-…`，不是 `com.previewcraft.desktop`）、桌面与开始菜单快捷方式齐、安装目录 420.9MB → **在安装版靶子 `release/win-unpacked/PreviewCraft.exe` 上跑全量冒烟 122/122 PASS、零 SKIP**，本轮 9 条新断言在打包态（`app.isPackaged=true`、渲染走 asar）逐条真跑过：四条越界输入被主进程拒（路径不在缓存目录 / 非 http(s)）、`window.open` 返回 null、launch 失败后下一次截图仍出图、并发 `captureStart` 被互斥挡下、改地址后 `img 0 / iframe 4`。踩坑一条：PowerShell 内联命令里的 `$p` 被 Git Bash 当变量展开掉，解析期就报错（安装器根本没跑），改写成 `.ps1` 文件 `-File` 执行才对 | ① **GitHub Release 未挂**，需用户 `gh auth login`（设备码只在终端打印、须等轮询完成才落 `%APPDATA%\GitHub\`，CLI 一律不要注入 `HTTP(S)_PROXY`）或授权我起会话由其在浏览器输码；② 用户批准清单里的「iframe 加 `sandbox`」判定不做（会向下传播给被预览页面的子帧且不可解除，视频/地图类组件黑屏，代价大于收益），已在其回复中知情；③ §7「已报出、待排期」五项未动 |
 | 2026-09-20 | 2.1.4 Release 补挂（**四道门全过**） | 关闭上一条遗留 ①。`gh` 认证走用户放行的设备码流程（`A78C-xxxx` 由用户在浏览器输码），登录后 `gh auth status` 确认账号 `baiwumm`、token scopes `gist/read:org/repo`、协议 ssh。**Release** <https://github.com/baiwumm/preview-craft/releases/tag/2.1.4> 已发并挂上 `PreviewCraft-Setup-2.1.4.exe`：**匿名 API 核验 `draft=false`、附件 116,566,272 字节 = 本地 `stat` 一致**；公开下载链路 Range 请求回 **206 / 16 字节、首两字节 `MZ`**（真在伺服 PE）。说明稿含修复清单、字节数与 SHA256。**这条网络口径要更正上一轮写下的「CLI 一律不要注入 `HTTP(S)_PROXY`」——那是半成品结论，实测本机当前是分裂路由**：`github.com`（设备码 `POST /login/device/code`、Release 下载跳转）直连**超时**、走系统代理 `127.0.0.1:7890` **1.1s 通**；而 `api.github.com` 直连 0.28s 通、走代理 **403**。所以按端点分：**设备码与下载链路带 `-x http://127.0.0.1:7890`，API 读写与 `gh release create` 一律裸连**。另记一条 gh 用法坑：`--web` 流程的一次性码要先过「Press Enter to open browser」，把命令接进 `| tail` 会把码缓冲掉、拿不到 —— 后台任务直接输出到它自己的日志文件再读，别加管道 | ① `sandbox` 判定不做（渲染保真代价）；② §7「已报出、待排期」五项技术债待用户排期；③ 本轮 docs 提交是否推 origin 待放行 |
+| 2026-09-20 | 视觉迭代（v2.2.0，**用户看图签字**） | 用户指「预设模板有点丑」，拿 shots.so 做参照先出方案再动手，批准范围只含「零 schema / 零 IPC / 零导出尺寸变更」那一档。**先量后改**：写脚本按统一口径算出改前五套的包围盒留白与遮挡 —— `row` 左右留白仅 **25px**（贴边）且四台底边 585/551/493/553 无对齐轴、`focus` 水平偏心 22.5px 且画面占比仅 63%、`editorial` 偏心 14px、`classic` 前景压住后景屏幕 **14.8%**（「糊成一团」的根因）。**改后**：留白 88~205px、五套水平偏心全部 ≤7.5px、上下差 ≤19px、占比 71~84%、最大压屏 4.7%（`focus` 10.1% 为有意叠层），`row` 四台底边全落 566.1 且间隙等距 22px。判据**固化进冒烟 A 段**（留白 / 居中 / 占比 / 遮挡 / 底边对齐 / 间隙等距），以后改坐标即被校验。四项实现：① **背景板** 7 → 15 块分三组，渐变一律 `135deg` 三段 + 左上 `radial-gradient` 高光层（`value` 本就是单个 CSS 串，多层叠加零 schema 变更），自定义渐变同步改 135deg；② **阴影** `DeviceFrame` 原对四台一律 `0 18px 32px/.35`，改 `deviceShadow(displayWidth)` 按显示宽折算 + 双层（desktop 660 → `0 28.8px 54.4px`，mobile 140 → `0 8.1px 15.3px`），helper 落 `lib/design.ts` 供真机与缩略图共用；③ **设备壳** desktop 外接高 548 → 478（支架颈 84×86 → 56×42、底座 304 → 148、下巴 42 → 20、金属由亮银改空间灰），mobile 加 `shell.island` 灵动岛（画在内屏裁剪层内，坐标与机身同基准、定位需从 inner 原点做差值），摄像头件从白色块改暗镜片，机身加 `0 0 0 .8k rgba(255,255,255,.14)` 外轮廓光——**这条是实测逼出来的**：`focus` 首版黑底压黑壳，设备轮廓整个消失；④ **缩略图** `ThumbCanvas` 补同一套阴影 + 玻璃压边 + 灵动岛，内屏占位从 `bg-white/70` 改中性渐变，画廊与真机所见一致。**背景板选择器换 HeroUI 内置 `ColorSwatchPicker`**（用户点名要内置，替掉手写 button 网格）：读安装包源码确认边界——选中态以 `color.toString('hexa')` 为唯一 key、`color` 参数走 `parseColor` 所以**渐变串进不去**，故每块背景补 `color` 代表色（15 个互不相同，冒烟锁死），真实 CSS 经 `ColorSwatchPicker.Swatch` 的 `style` 透传覆盖；每组各一个 picker，跨组互斥用「点选后全页仅一项 `data-selected`」断言兜。**代价（已告知并获准）**：内置色块只有 16~40px 方/圆，做不了原来的宽条块 + 每块挂中文名，`title` 也不在 `ColorSwatchPickerItemProps` 类型里（TS 直接拒），故名称改为「当前：X」单行回显 + `aria-label`。**门禁**：typecheck / lint / build 三绿；冒烟 A 段先 50/50，加条目后全量 **132 条**（本轮 2 条 SKIP 是 github.com 探测超时的既有外网依赖分支，非本轮引入）。**出图核验**：CDP 驱动真实应用截 `tailwindcss.com` 四台 → `exportCompose` 逐套预设出 1x PNG + 三张应用内界面图，用户看图通过 | ① 代码按 feat / test / docs / chore 四个 commit 落库，**出包 / 推 origin / tag+Release / 装机复验四道门全部待放行**；② 方案级那条**没做**：浏览器窗口壳（`Placement.frame`，即 shots 的 Frame 模式）——chrome 条应撑在 inner 之外、viewport 保持不变，否则截图内容被拉伸；且导出态要在地址栏显示 URL 需给 `ExportRenderPayload` 加 `urls` 字段，属契约变更，排在 §7 五项技术债之后；③ README 两张配图本轮重拍替换（旧图仍是淡彩底 + 粗支架时代产物）；④ 画廊卡片在缩略图与标题之间有一段 `bg-surface` 深色留白，2.1.x 既有观感、本轮未动 |
 
 ## 六、待确认
 
@@ -242,6 +253,10 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 - **应用内自动更新**：2.1.3 已落「轻量档」（`src/main/update.ts` 比对 GitHub Releases + 设置「关于」页手动触发、只跳转不自动装）。剩余的是「完整档」electron-updater 方案，代价是发布流程被代码签名绑死，单人自用暂不值。
 - **Chromium 下载真取消**（2.1.3 只做了下载前二次确认）：`@puppeteer/browsers@3.2.2` 的 `install()` 无 AbortSignal，且打包后该库在 `app.asar` 内、子进程读不到。两条路：自实现下载器（Node 内置 fetch + AbortController + `tar.exe` 解 zip，约 0.5~1 天），或把库解包成 extraResources（约 0.5 天）。
 - **16px 图标简化版**：当前 `icon.svg` 在 24px 以上清晰、16px 偏糊（Windows 实际主要取 32/48，可接受）。在意的话需另出一套手绘简化版走多帧 ICO。
+- **浏览器窗口壳（shots 的 Frame 模式）**：2.2.0 只做了「不改契约」那一档，这条是方案级、需先记 §六 待确认再动。落法：`Placement.frame?: 'device' | 'browser'`（缺省 `'device'`，已存自定义模板不失效），`devicePresets[d].frame` 拆成 `frames: { device, browser }` 各带 `aspect` / `inner`；**chrome 条必须撑在 inner 之外、把机身加长**，viewport 保持不变，否则截图内容被拉伸、还得改 `capture.ts` 与截图 IPC。导出态要在地址栏显示真实 URL，需给 `ExportRenderPayload` 加 `urls` 字段（不能塞进 template——模板是排版数据）。
+- **画布比例族**（4:3 / 1:1 / 9:16 等，shots 有 5:4 一档）：牵动全部预设坐标、已存自定义模板、以及冒烟里 2240×1740 的尺寸断言，代价远大于「多个选项」的收益，暂不做。
+- **同一类设备放多台**（两个手机并排这类布局）：现在 `Canvas` 用 `key={placement.device}`、`shots: Record<DeviceId, string>`、`StylePanel` 的 `find(p => p.device === …)` 全都假设每台唯一，要加 `slot` id 并改截图结果、单台重试、样式面板三处。
+- **Tilt 3D 透视**（shots 招牌）：`perspective + rotateY` 与 `filter: drop-shadow` 组合在隐藏窗口 `capturePage` 下的渲染表现未验证，风险/收益不划算，暂缓。
 
 ### 已报出、待排期的技术项（2.1.4 评审时判定不在当轮范围）
 
