@@ -199,10 +199,58 @@ async function closeAllDialogs(page) {
     if (!open) return true;
     await page.keyboard.press('Escape');
     await sleep(500);
+    // Esc 后节点还挂着，多半是页面掉到 hidden 生命周期导致退场动画从未起跑 —— 就地自救
+    const stillUp = await page.evaluate(
+      () => [...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0)
+    );
+    if (stillUp) {
+      await reviveHiddenPage(page);
+      await forceFinishAnimations(page);
+      await sleep(250);
+    }
   }
   return page.evaluate(
     () => ![...document.querySelectorAll('.modal__dialog')].some((el) => el.getBoundingClientRect().height > 0)
   );
+}
+
+/**
+ * 窗口不可见时的自救。两条独立手段，按现场证据分工：
+ * - 页面掉到 hidden 生命周期时 CSS 动画**根本不会被创建**（实测 anims 为空、
+ *   而 timeline 仍在推进），所以先经 CDP 把生命周期拉回 active，动画才会起跑；
+ * - 已经在飞的退场动画用 finish() 立刻落到终态并派发 animationend
+ *   （HeroUI Modal 靠它卸载节点；无限循环动画 finish() 会抛，忽略即可）。
+ * 遮罩 .modal__backdrop 不消失会吞掉后续每一次点击，一处卡死就磨出一串假 FAIL。
+ */
+async function reviveHiddenPage(page) {
+  try {
+    const cdp = await page.createCDPSession();
+    await cdp.send('Page.setWebLifecycleState', { state: 'active' });
+    await cdp.detach().catch(() => undefined);
+    await sleep(400);
+    return await page.evaluate(() => document.visibilityState);
+  } catch {
+    return null;
+  }
+}
+
+async function forceFinishAnimations(page) {
+  try {
+    return await page.evaluate(() => {
+      let n = 0;
+      for (const a of document.getAnimations?.() ?? []) {
+        try {
+          a.finish();
+          n += 1;
+        } catch {
+          /* 无限迭代动画不能 finish，跳过 */
+        }
+      }
+      return n;
+    });
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -440,6 +488,13 @@ async function runLogicSection() {
   check('isTemplateModified 识别排版改动', isTemplateModified(cloned, original) === true && isTemplateModified(cloneTemplate(original), original) === false);
   check('isTemplateModified 无来源时判未改', isTemplateModified(cloned, undefined) === false);
   check('buildCustomBackground 生成 custom 前缀', buildCustomBackground('#aaa', '#bbb') === 'custom:linear-gradient(135deg, #aaa, #bbb)');
+
+  // AGENTS.md 第三节红线：setState 的更新函数里不许发 IPC —— StrictMode 下更新函数双调用，
+  // dev 会真发两次写盘。这条没有外部可观测行为（模板 id 是时间戳 upsert，双发只留一条），
+  // 所以按旧代码的具体形状做静态判据，能挡住同样的写法被改回去。
+  const appSrc = await readFile(join(ROOT, 'src/renderer/src/App.tsx'), 'utf8');
+  const ipcInUpdater = [...appSrc.matchAll(/set[A-Za-z]+\(\(prev\) => \{\s*if \(window\.api\)/g)].map((m) => m[0].trim());
+  check('setState 更新函数内不发 IPC', ipcInUpdater.length === 0, ipcInUpdater.join(' | '));
   check('会话默认样式基线', defaultStyle.borderRadius === 12 && defaultStyle.shadow === true && defaultStyle.zoom === 1, `圆角=${defaultStyle.borderRadius}`);
 
   check('错误归因·超时', describeCaptureError('Navigation timeout of 30000 ms exceeded').includes('加载超时'));
@@ -493,6 +548,28 @@ async function runLogicSection() {
 }
 
 /* ========================================================= B. 真实应用 E2E */
+
+/**
+ * 列出「不是本轮冒烟起的」应用进程（命令行里没有 smoke-profile 的那些）。
+ * 「未污染用户真实设置」只比对真实 settings.json 的前后哈希，而用户自己开的 dev 实例
+ * （`electron .` 不带 --user-data-dir）同样在写这个文件 —— 2.2.0 发布轮就因此假红过一次，
+ * 取证是 PID 1900 那个实例在冒烟中途写了真实档案。分不清污染与并发使用的断言不该判红。
+ * 脚本内容必须纯 ASCII：PowerShell 5.1 按 GBK 读无 BOM 的 UTF-8，中文会把引号吞掉。
+ */
+function findForeignAppProcesses() {
+  const psFile = join(OUT_DIR, 'foreign-apps.ps1');
+  writeFileSync(
+    psFile,
+    "Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('electron.exe','PreviewCraft.exe') -and $_.CommandLine -notlike '*smoke-profile*' } | ForEach-Object { Write-Output ($_.ProcessId.ToString() + ':' + $_.Name) }\n",
+    'utf8'
+  );
+  try {
+    const out = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psFile}"`, { encoding: 'utf8' });
+    return out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
 
 /** 只清理上一轮冒烟自己的实例（按 user-data-dir 特征匹配），不动其他 Electron 应用 */
 function killStraySmokeInstances() {
@@ -580,6 +657,7 @@ async function runAppSection() {
   const realSettings = appData && existsSync(join(appData, 'settings.json')) ? join(appData, 'settings.json') : null;
   const hashFile = async (p) => (p ? createHash('sha1').update(await readFile(p)).digest('hex') : 'absent');
   const realHashBefore = await hashFile(realSettings);
+  const foreignBefore = findForeignAppProcesses();
 
   killStraySmokeInstances();
   await sleep(1000);
@@ -682,11 +760,23 @@ async function runAppSection() {
         log(`      [scene] ${JSON.stringify(scene)}`);
         if (!scene.frozen) {
           frozenScenes = 0;
-        } else if (++frozenScenes >= 2) {
-          throw new Error(
-            `应用窗口已不可见（visibility=${scene.vis}，动画时间轴 ${scene.timeline}），弹窗退场动画无法结束 —— ` +
-              '后续断言全部不可信，请让窗口保持可见后重跑本轮冒烟'
+        } else {
+          const revived = await reviveHiddenPage(page);
+          const finished = await forceFinishAnimations(page);
+          log(`      [recover] ${label} — visibility=${revived ?? 'CDP 不可用'}，强制结束动画 ${finished} 条`);
+          const retry = await soft(`${label}（自救后重试）`, () =>
+            page.waitForFunction(expr, { timeout: 8_000, polling: 250 }, arg)
           );
+          if (retry) {
+            frozenScenes = 0;
+            return true;
+          }
+          if (++frozenScenes >= 2) {
+            throw new Error(
+              `应用窗口已不可见（visibility=${scene.vis}，自救后仍未恢复），弹窗退场动画无法结束 —— ` +
+                '后续断言全部不可信，请让窗口保持可见后重跑本轮冒烟'
+            );
+          }
         }
       }
       await sleep(250);
@@ -700,7 +790,7 @@ async function runAppSection() {
     const API_METHODS = [
       'browserDetect', 'browserDownload', 'onBrowserDownloadProgress', 'captureStart', 'previewProbe', 'onCaptureProgress',
       'exportCompose', 'exportSave', 'exportClipboard', 'onExportRender', 'onWebpConvert', 'exportReady',
-      'exportWebpResult', 'settingsGet', 'settingsSet', 'appVersion', 'cacheStats', 'cacheClear', 'pickBrowserPath',
+      'exportWebpResult', 'settingsGet', 'settingsSet', 'sessionGet', 'sessionSet', 'appVersion', 'cacheStats', 'cacheClear', 'cacheOpen', 'pickBrowserPath',
       'clipboardReadText', 'shotDataUrl', 'updateCheck', 'updateOpen', 'templatesGet', 'templatesSave', 'templatesDelete'
     ];
     const missing = await page.evaluate((names) => names.filter((n) => typeof window.api?.[n] !== 'function'), API_METHODS);
@@ -1148,6 +1238,11 @@ async function runAppSection() {
 
     await tap(page, locator('[role="tab"]', '缓存'));
     await waitTrue('等缓存统计出数', `/(\\d+) 个文件/.test(document.body.innerText)`);
+    // 只验入口存在，不点：点了会真开一个资源管理器窗口，本环境里属不可靠副作用
+    check(
+      '缓存页含「打开缓存目录」入口',
+      await page.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent.includes('打开缓存目录')))
+    );
     const cacheFiles = await page.evaluate(() => document.body.innerText.match(/(\d+) 个文件/)?.[1] ?? null);
     check('缓存页签显示临时产物统计', cacheFiles !== null && Number(cacheFiles) > 0, `${cacheFiles} 个文件`);
     await tap(page, locator('[role="tab"]', '关于'));
@@ -1236,6 +1331,15 @@ async function runAppSection() {
     check('UI 导出产出合成文件', Boolean(newExport), newExport ?? '300s 内未产出');
     if (newExport) await copyFile(join(tempDir, newExport), join(OUT_DIR, `ui-${newExport}`));
 
+    /* --- 10b. 会话快照落盘（防抖 800ms，等一轮再读） --- */
+    await sleep(1400);
+    const snap = await api('sessionGet');
+    check(
+      '会话快照会落盘（URL / 模板 / 圆角）',
+      Boolean(snap?.mainUrl && snap.template?.id && typeof snap.style?.borderRadius === 'number'),
+      snap ? `url=${snap.mainUrl} template=${snap.template.id} radius=${snap.style.borderRadius}` : 'null'
+    );
+
     /* --- 11. 单实例锁 --- */
     const second = await new Promise((resolve) => {
       const proc = spawn(bin, launchArgs(null), { cwd: ROOT, stdio: 'ignore' });
@@ -1252,7 +1356,46 @@ async function runAppSection() {
     const isolated = [join(PROFILE_DIR, 'settings.json'), join(PROFILE_DIR, 'preview-craft', 'settings.json')].find((p) => existsSync(p));
     check('冒烟实例数据落在隔离档案', Boolean(isolated), isolated?.replace(ROOT, '.') ?? '.smoke-profile 内未见 settings.json');
     const realHashAfter = await hashFile(realSettings);
-    check('未污染用户真实设置', realHashBefore === realHashAfter, `${realHashBefore.slice(0, 8)} → ${realHashAfter.slice(0, 8)}${realSettings ? '' : '（用户尚无 settings.json）'}`);
+    const foreign = [...new Set([...foreignBefore, ...findForeignAppProcesses()])];
+    if (realHashBefore === realHashAfter) {
+      check('未污染用户真实设置', true, `${String(realHashBefore).slice(0, 8)} 未变`);
+    } else if (foreign.length > 0) {
+      // 有别人的实例在用真实档案，哈希变了也不能算到冒烟头上
+      skip(
+        '未污染用户真实设置',
+        `非冒烟实例在用真实档案（${foreign.join(', ')}），哈希 ${String(realHashBefore).slice(0, 8)}→${String(realHashAfter).slice(0, 8)} 无法归因于冒烟`
+      );
+    } else {
+      check(
+        '未污染用户真实设置',
+        false,
+        `${String(realHashBefore).slice(0, 8)} → ${String(realHashAfter).slice(0, 8)}${realSettings ? '' : '（用户尚无 settings.json）'}`
+      );
+    }
+
+    /* --- 缓存回收：必须放在所有导出断言之后，否则会删掉它们还要用的截图文件 --- */
+    const capA = await api('captureStart', { url: SITE, deviceUrls: {}, devices: ALL_DEVICES });
+    const cacheMid = await api('cacheStats');
+    const capB = await api('captureStart', {
+      url: SITE,
+      deviceUrls: {},
+      devices: ALL_DEVICES,
+      replace: capA.shots
+    });
+    const cacheAfter = await api('cacheStats');
+    const oldGone = await page.evaluate(async (p) => {
+      try {
+        await window.api.shotDataUrl(p);
+        return false;
+      } catch {
+        return true;
+      }
+    }, capA.shots.desktop);
+    check(
+      '重截会删掉被替换的旧截图（缓存不累积）',
+      Object.keys(capB.shots).length === 4 && oldGone && cacheAfter.files <= cacheMid.files,
+      `重截前 ${cacheMid.files} 个 → 带 replace 重截后 ${cacheAfter.files} 个，旧 desktop 图已回收=${oldGone}`
+    );
 
     const statsBefore = await api('cacheStats');
     check('cacheStats 统计到临时产物', statsBefore.files > 0 && statsBefore.bytes > 0, `${statsBefore.files} 个 / ${human(statsBefore.bytes)}`);
