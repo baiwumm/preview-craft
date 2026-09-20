@@ -34,16 +34,16 @@
 
 ### 设备 preset
 
-| device | viewport (css px) | UA 特征 | isMobile | hasTouch | 壳图宽 | 壳宽高比 | 内屏 inner |
+| device | viewport (css px) | UA 特征 | isMobile | hasTouch | 机身宽 | 机身宽高比 | 内屏 inner（机身内偏移） |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| desktop | 1440 × 950* | 桌面 Chrome UA | false | false | 620 | 671/629 | 600 × 396 |
-| laptop | 1366 × 892* | 桌面 Chrome UA | false | false | 520 | 969/579 | 408 × 266 |
-| tablet | 768 × 1022* | iPad UA | true | true | 300 | 981/1293 | 280 × 372 |
-| mobile | 390 × 840* | iPhone UA | true | true | 138 | 1000/2025 | 124 × 267 |
+| desktop | 1440 × 950* | 桌面 Chrome UA | false | false | 620 | 620/548 | 600 × 396（10,10） |
+| laptop | 1366 × 891* | 桌面 Chrome UA | false | false | 520 | 520/304 | 408 × 266（56,12） |
+| tablet | 768 × 1020* | iPad UA | true | true | 300 | 300/396 | 280 × 372（10,12） |
+| mobile | 390 × 840* | iPhone UA | true | true | 138 | 138/279 | 124 × 267（7,6） |
 
 \* viewport 高度按「内屏宽高比」换算保证内容不变形：`height = round(width × innerH / innerW)`，实现时以此公式为准。
 内屏 `inner` 是设备壳上的透明展示区，截图 `<img>` 与预览 `<iframe>` 都缩放铺到这里：`scale = innerW / viewportW`。
-壳图从 git 历史恢复：`git show v1.3.0:public/desktop.png > resources/frames/desktop.png`（4 张同名）。
+**数值以 `src/shared/devices.ts` 为准**；2.1.0 起设备壳改为纯 CSS 绘制（机身/支架/刘海等几何同样在该文件），旧版壳图 PNG 与 `git show 1.3.0:public/<device>.png` 的恢复路径已废弃、不再使用。
 
 ### 排版模板 schema 与 5 套预设
 
@@ -181,9 +181,10 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 - [x] P3 模板系统
 - [x] P4 导出闭环
 - [x] P5 打磨与分发（2026-09-19 完成：打包 / 安装 / 全流程 / 卸载实测通过；「保存对话框落盘 + NSIS 中文安装界面」目视与「卸载是否清数据」口径均已由用户确认关闭）
-- [x] 回归冒烟基线（2026-09-19：`scripts/smoke.mjs` 常驻，源码态 **111/111 + 2 SKIP**、安装版 exe **69/69**；超时自动转储现场、窗口停帧即判红、网络探测不通的分支走 `skip()` 不再虚报 PASS，详见「五、执行记录」）
-- [x] 反馈迭代 2.1.0 ~ 2.1.3（**当前发布版 2.1.3**：装机反馈 4 项修复 + 预览拦截占位 + 检查更新「关于」页 + Chromium 下载二次确认 + 图标重设计为白底黑标并补 alpha；tag `2.1.3` 与 GitHub Release 已发、安装包已核验字节数与 SHA256 与本地一致、已静默装到本机）
-- [ ] 下一步：Backlog 择机（长截图 / 登录态截图 / 批量队列 / OG 预设 / 托盘 / 导出历史），以及 16px 图标简化版与 Chromium 真取消（0.5~1 天）——均未开工
+- [x] 回归冒烟基线（2026-09-20：`scripts/smoke.mjs` 常驻，源码态 **122/122 PASS、零 SKIP**；超时自动转储现场、窗口停帧即判红、网络探测不通的分支走 `skip()` 不再虚报 PASS，详见「五、执行记录」。**跑前必须 `pnpm build`**：`smoke` 脚本不含构建，仓库里的 `out/` 一旦落后于源码就会打出一串假 FAIL（2026-09-20 踩到：2.0.0 时代的 `out/` 缺 2.1.x 全部功能，10 条红）。安装版 `--exe` 模式的靶子 `release/win-unpacked/` 已随 `release/` 清理而不在盘上，要复验需重跑 `pnpm dist`）
+- [x] 反馈迭代 2.1.0 ~ 2.1.3（**线上发布版 2.1.3**：装机反馈 4 项修复 + 预览拦截占位 + 检查更新「关于」页 + Chromium 下载二次确认 + 图标重设计为白底黑标并补 alpha；tag `2.1.3` 与 GitHub Release 已发、安装包已核验字节数与 SHA256 与本地一致、已静默装到本机）
+- [x] 缺陷收口 2.1.4（2026-09-20：渲染→主进程边界收紧、截图引擎不再被一次启动失败锁死、换地址清掉对应设备旧截图、截图任务互斥 + 删死文件。**代码与本地门禁已完成，尚未 `pnpm dist` / 推 origin / 打 tag / 发 Release / 装机**）
+- [ ] 下一步：2.1.4 的发布四道门（出包 → 推送 → tag/Release → 装机复验）待用户逐门放行；其后 Backlog 择机（长截图 / 登录态截图 / 批量队列 / OG 预设 / 托盘 / 导出历史），以及 16px 图标简化版与 Chromium 真取消（0.5~1 天）
 
 ## 五、执行记录
 
@@ -210,6 +211,7 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 | 2026-09-19 | 图标重设计 + 下载二次确认（v2.1.3） | **dev 图标问题定位**：`createWindow()` 从未传 `icon`，未打包运行时 Windows 退回 Electron 默认图标（打包版由 electron-builder 把 `win.icon` 烤进 exe，所以一直是对的）→ 改为 `!app.isPackaged` 时传 `resources/icon.png`（该目录不随包发布，故只在 dev 生效，打包版不受影响）。**旧标两处硬伤**：沿用废弃 Web 版 1.3.0 的「P」字标 + 暮色紫底，与产品语义无关；且 `icon.svg` 里 `translate(96 96) scale(20)` 把 24px 图形放大到 480 超出 512 画布，右下角是被切的。**新标**：把产品自身的视觉语言抽象成设备构图 —— 显示器（机身 + 支架 + 底座，屏幕用 mask 镂空让底色透出）+ 手机压在右下前方，遮挡关系靠 mask 让出的一圈 12px 间隙表达而不是描边；底色沿用应用默认背景板暮色紫（三段渐变 + 左上极淡高光），墨色 `#171720`。渲染管线不变：`icon.svg` 为源，puppeteer-core + 本机 Chrome 光栅化 512 PNG，electron-builder 构建期转 ICO。16~256px 全尺寸出图目检：24px 以上清晰，16px 偏糊（Windows 实际取 32/48 为主，可接受）。**README 主界面图重拍**：原图是 PNG 壳时代产物、缩略图还带着「LARGE SCREENSHOTS」水印占位，已过期；CDP 驱动 `electron .` → github.com → Ctrl+Enter 真实截图 → 1280×800 重截。**下载二次确认**（第 4 项的 B 方案）：新增 `ChromiumDownloadButton`（idle → 确认态「确认下载（约 150 MB，无法中途取消）」→ 开始；8s 自动收回；下载中复位并禁用），引导弹窗与「设置 → 浏览器」两个入口统一换用；真取消受 `@puppeteer/browsers` 无 AbortSignal 限制，维持 Backlog。**冒烟**：加两段式确认 2 条断言（只验确认态，绝不真下 150MB）；`typeInto` 加三次重试 + 「名字没落进输入框就不点保存」的护栏 —— 上一轮 11 条连锁 FAIL 由 `[scene]` 转储定位为空输入框触发 `if (!trimmed) return`、弹窗不关吃掉后续所有点击，重试后 **112/112 PASS、零 soft、零 warn**。版本升 **2.1.3** | 16px 图标在小尺寸场景（任务栏合并窗口、部分第三方列表）仍偏糊，如在意可加一套手绘简化版走 `largeIcon`/多帧 ICO；真取消下载仍在 Backlog |
 | 2026-09-19 | 图标 alpha 缺陷 + 改白底黑标 + 冒烟反节流 | **用户装机后指出的两处**：① 「dev 预览图标没变」—— 上一轮的 dev 图标修复有效，但**他看到的窗口是在新 `icon.png` 落盘（20:52）之前创建的**，图标只在窗口创建时读一次，重启 dev 即正常；② 「任务栏缩略图带白底」—— 真缺陷：我用 Chrome 截图生成 `icon.png` 时漏了 `omitBackground`，产物退化成 **`colorType=2`（RGB，无 alpha）**，圆角外全是不透明白，任务栏与缩略图就露出白方块。修完为 `colorType=6`、四角 `0,0,0,0`，并**给冒烟加一条锁死该属性**（512×512 + 8bit + RGBA）。**风格按用户要求改判**：弃掉暮色紫渐变（「太丑」），改**纯白底 + 近黑图形 `#111114`**（DeepSeek 式平涂），仅保留一圈 `#E7E7EE` 极淡描边防纯白在浅色资源管理器里糊边；设备构图不变。副作用是体积从 147KB 掉到 12KB。**从新 `release/win-unpacked/PreviewCraft.exe` 抽出 32×32 图标复验**：四角 alpha=0、底 `255,255,255`、图形 `#131316` ✓ 白底问题在产物层面消除。 **更正上一条记录的归因**：我曾把「保存后弹窗未关引发 11 条连锁」判为「脚本固定 sleep 不够」，不准确。真因是**窗口被遮挡 → Chromium 节流 rAF → HeroUI Modal 退场动画永不结束 → 节点不卸载、遮罩仍在 → 后续每次点击都被吞**（证据链：`[warn]` 为零说明名字已写入、`templatesGet` 已通过、输入框已被 `setName('')` 清空，唯独弹窗还在；且 Esc 也关不掉，说明不是点击丢失）。属测试环境耦合而非应用缺陷（用户点保存时窗口必在前台；理论上点完立刻 Alt+Tab 可能短暂滞留，系 HeroUI 依赖动画结束才卸载的固有行为，罕见且仅关观感，不动组件）。修法给被测进程加三个反节流开关 `--disable-backgrounding-occluded-windows` / `--disable-renderer-backgrounding` / `--disable-background-timer-throttling`，另加 `focusAppWindow()`（每段 UI 交互前置前）与 `closeAllDialogs()`（**Esc 清场**，键盘事件经 CDP 直达渲染进程、不受系统焦点影响）。加固后 **113/113 PASS、零 soft、零 warn**，探测与占位、二次确认、关于页、检查更新全部真跑通。2.1.3 重出包 116,561,932 字节 | 图标小尺寸（16px）仍偏糊，如在意需另出一套简化版；推送 / tag / Release / 安装四道门均待用户视觉签字 |
 | 2026-09-19 | 2.1.3 发布收口 + 安装版冒烟归因更正 | **发布链走完**：`release/` 只留最新包（2.1.2 连同 blockmap 删除）→ 推 `5018b01` → annotated tag `2.1.3`（无前缀，与旧 1.x 一致）→ `gh release create` 挂 `PreviewCraft-Setup-2.1.3.exe`。**匿名核验**：API 附件 116,561,932 字节 = 本地一致，`draft=false`，Range 请求 206 且首 16 字节为 `MZ`（公开链路真在伺服）。**静默安装落位全绿**：`DisplayVersion=2.1.3`、`%LOCALAPPDATA%\Programs\PreviewCraft\PreviewCraft.exe`、桌面 + 开始菜单快捷方式，安装版 `app.asar` 头里 `.smoke-out` / `.smoke-profile` 命中 0（上轮打包卫生修复未回退）。**图标产物复验**：`icon.ico` 7 帧全 32bpp，32×32 与 256×256 为 PNG 封装（真 alpha、无 AND 掩码），任务栏白底在 exe 层面消除。**安装版冒烟：首跑 56/71 FAIL（exit 1，门禁确实判红了），此后 3 次 69/69 全绿零 soft**（断言数 71→69 是设计内分支：`Esc 可收设置弹窗` 仅在「关闭」按钮失败时兜底；拦截占位在探测不通时跳过）。**三条取证把上一轮的归因推翻**：① 加上 `--disable-features=CalculateNativeWinOcclusion` 后转绿属巧合 —— 同 exe 同脚本做 A/B、只去掉该开关，照样 69/69，**开关已撤回**，不把无效咒语留在基线里；② 用顶层不透明 WinForms 表单整片盖住被测窗口，`visibilityState` 仍是 `visible`、弹窗 1s 正常卸载，**「被遮挡」这个说法（含上一条记录写的真因）不成立**；③ 卡住期间 `setTimeout` / React 渲染 / IPC 全部正常、只有动画不动，且整轮余下时间再没恢复 —— 与 `export.ts:48` 早记过的「普通隐藏窗口不产帧、导出窗必须 `offscreen`」是同一机制。**结论：首跑是窗口停止产帧的环境事件（锁屏 / 熄屏 / 最小化），既非应用缺陷也非安装版专属路径**。**据此只动测试侧**：`waitTrue` 现场转储补 `document.timeline` 两次采样 + `visibilityState` + `hasFocus` + 弹窗内动画 `playState@currentTime`，并**连续两次取到「窗口不可见」即抛具名 FATAL 退出**，不再磨出一串假 FAIL（判据只用 `visibilityState`：空闲页面本就可以不推进 timeline，拿它当条件会误杀真实失败现场）。**顺带修冒烟诚实性**：github.com 探测不通时「拦截判定」与「画布占位」原先记成 PASS（`!siteProbed \|\| …`），把覆盖率虚报成满格 —— 改走新增的 `skip()`，汇总行成 `111/111 PASS + 2 SKIP（本轮未验到）` 并逐条列原因。**最终校验**：typecheck / lint 零错误；源码态全量 111/111 + 2 SKIP、安装版 69/69 | ① 环境性停帧无法无人值守预防，已改成「判红即定性」；若还要更硬的可恢复手段，候选是关窗后 `document.getAnimations().forEach(a => a.finish())` 或 `Page.setWebLifecycleState({ state: 'active' })`；② 拦截分支两条断言依赖外网，本机到 github.com 常 10s 上下顶到 8s 超时，近 3 轮里 2 轮 SKIP —— 要满覆盖得在 CI 里造一个可控的拒绝内嵌站点 |
+| 2026-09-20 | 缺陷收口（v2.1.4） | 用户拍「先修债、Backlog 往后延」，本轮只动已批准的四条真缺陷 + 文档纠偏，**不碰功能面**。**① 渲染→主进程边界**：主窗口挂 `setWindowOpenHandler` 一律 deny + `will-navigate` 只允许留在自身来源（设备屏里嵌的是任意远程站点，子帧 `window.open` 弹出的窗口按 Electron 规则继承 opener 的 webPreferences 含 preload，放行等于把整套 `window.api` 交给外部页面）；`capture:start` / `preview:probe` 在主进程侧过一遍 `normalizeUrl`（原先只有渲染侧校验，`file://` 与内网地址从这里出得去）；`shot:dataurl` / `export:save` / `export:clipboard` 的路径锁进 `shotCacheDir()`（`export.ts` 新增 `assertShotPath`，三条通道共用），`export:save` 的 `defaultName` 过 `basename` 防借它写出目录。**② 截图引擎生命周期**：`launchBrowser` 原先把 rejected promise 永久缓存 —— 一次 launch 失败（Chrome 被占用 / 崩掉）之后每次截图都返回同一个错误，只能重启应用；改为记 `{path, promise}`，失败即清缓存、挂 `disconnected` 断连即清、传入路径与缓存不同则关旧实例重开（顺带解决「设置里换了浏览器路径不生效」），`before-quit` 也把 `closeBrowser()` 从 fire-and-forget 改成带 2s 上限的等待，不再留孤儿 chrome.exe。**③ 换地址残留旧截图**：`handleApply` 原先只清 `shotErrors`，而 `DeviceFrame` 优先渲染 shot → 截完 A 站改成 B 站，画布仍是 A 的截图，此时直接导出会把 A 的图配上新排版且全程不报错（2.1.x 只修了失败分支，成功分支漏）。改为按「该台实际用的地址（自己的覆盖 \|\| 主地址）」精确清 `shots`/`shotPaths`/`shotErrors`，同值提交（失焦二次提交）仍是空集，不伤「重试」入口。**④ 截图并发**：单台重试不盖遮罩，`handleRetryDevice` 原先不查 `job` 也不挡连点 → 两条 `captureStart` 共用一个浏览器实例并发导航、后完成的覆盖先完成的；渲染侧加 `job` + 在途设备集合双护栏，主进程 `capture:start` 加在途标记（第二次直接抛「上一次截图还在进行中」），`UrlBar.submit` 在 `busy` 时直接返回（回车与失焦是三个已禁用按钮留下的旁路）。**⑤ 死文件与文档**：删 `renderer/templates/index.ts` + `devices.ts`（纯 re-export、全仓库零 importer，大家都直接引 `@shared/devices`）与随之悬空的 `getPresetById`；PLAN §2 设备表从 PNG 壳时代数值改为 CSS 壳实际值并标「数值以 `shared/devices.ts` 为准」（laptop 892→891、tablet 1022→1020、机身宽高比四列全换、删掉「壳图从 git 历史恢复」一句）；§7 Backlog 抬头「均未开发」纠正 —— 轻量档检查更新其实 2.1.3 已上线，同时把本轮评审发现但**未获批准动手**的项（导出 IPC 监听器泄漏、缓存只增不减、会话不落盘、`setState` 更新函数里发 IPC、`deviceScaleFactor:2` 语义、外网依赖的 2 条 SKIP）逐条记进去待排期。**冒烟新增 9 条断言**：四条越界输入被主进程挡下（缓存目录外读 ×2、非 http(s) ×2）、`window.open` 返回 null、launch 失败如实报错 + **失败后下一次截图仍成功**（真拿 `where.exe` 当浏览器触发失败，再改回自动检测截出图来）、并发 `captureStart` 被互斥挡下、改地址后 `img 0 / iframe 4`。**门禁**：typecheck / lint 零错误，`pnpm build` 通过，源码态全量 **122/122 PASS、零 SKIP**。**主动收窄的一处**：批准清单里的「iframe 加 `sandbox`」没做 —— `sandbox` 会向下传播给被预览页面自己内嵌的子帧且无法由子帧解除（视频/地图类嵌入组件会黑屏），为一张截图工具的渲染保真不值；顶层的 `setWindowOpenHandler` 已经关掉「外部页面拿到 bridge」这个真正的洞 | ① 本轮未做 `pnpm dist` / 推送 / tag / Release / 装机，四道门均待放行；② `release/` 已清空，`--exe` 打包版冒烟要等重新出包才有靶子；③ 环境性停帧仍只能「判红即定性」；④ 拦截占位两条断言依旧依赖外网（本轮网络争气，零 SKIP） |
 
 ## 六、待确认
 
@@ -222,14 +224,25 @@ settingsGet(): Promise<AppSettings>; settingsSet(patch: Partial<AppSettings>): P
 5. **版本更新提示**：本期不做，方案记录在「七、Backlog」，需要时再选型。
 6. **纯逻辑单测要不要上 vitest**（2026-09-19 冒烟基线新增）：✅ 已定夺**不引入** —— 核心纯函数断言继续内嵌在 `scripts/smoke.mjs` A 段（Node 24 直跑 `src` 下 TS，零新依赖，`pnpm smoke` 一条命令跑完），新增纯函数断言直接往 A 段加；不引入 vitest 的 watch / 覆盖率，换取依赖面不变。
 
-## 七、Backlog（后续迭代，均未开发）
+## 七、Backlog（后续迭代）
+
+### 功能（均未开发）
 
 - fullPage 长截图
 - 登录态截图（复用用户 Chrome profile）
 - 批量 URL 队列
 - OG image 尺寸预设
-- **版本更新提示**（2026-09-19 确认本期不做，两档方案待选）：
-  - 轻量：启动时请求 GitHub Releases（或自建版本 JSON）比对版本号，Toast/Modal 提示「前往下载」，无新依赖；
-  - 完整：electron-updater + GitHub Releases，应用内自动下载与一键安装（引入 electron-updater 依赖，发布流程固定走 GitHub Releases）。
 - 系统托盘与全局快捷键
 - 导出历史记录
+- **应用内自动更新**：2.1.3 已落「轻量档」（`src/main/update.ts` 比对 GitHub Releases + 设置「关于」页手动触发、只跳转不自动装）。剩余的是「完整档」electron-updater 方案，代价是发布流程被代码签名绑死，单人自用暂不值。
+- **Chromium 下载真取消**（2.1.3 只做了下载前二次确认）：`@puppeteer/browsers@3.2.2` 的 `install()` 无 AbortSignal，且打包后该库在 `app.asar` 内、子进程读不到。两条路：自实现下载器（Node 内置 fetch + AbortController + `tar.exe` 解 zip，约 0.5~1 天），或把库解包成 extraResources（约 0.5 天）。
+- **16px 图标简化版**：当前 `icon.svg` 在 24px 以上清晰、16px 偏糊（Windows 实际主要取 32/48，可接受）。在意的话需另出一套手绘简化版走多帧 ICO。
+
+### 已报出、待排期的技术项（2.1.4 评审时判定不在当轮范围）
+
+- **导出 IPC 监听器与定时器不泄漏**：`export.ts` 等 `export:ready` / `export:webp:result` 用的是 `ipcMain.once`，20s/15s 超时胜出后监听器不被摘除；`capture.ts` 的 `withTimeout` 不 clear timer；`ExportPage.tsx` 等图片解码的自续 `setTimeout` 无 cleanup 且永不超时会一直轮询。因导出被遮罩串行化，当前危害有限（下一轮导出可能被残留监听器提前放行）。
+- **截图缓存只增不减**：唯一删除入口是全量「清除缓存」。每轮截图 4 张大 PNG + 每次导出 1 张落 `%TEMP%/preview-craft`，失败/重试丢弃的也只是路径、文件留在盘上。缺按台清除、缺容量上限、缺「打开缓存目录」。
+- **会话状态不落盘**：URL / 选中模板 / 样式微调重启即丢（设置与自定义模板已持久化）。
+- **`setState` 更新函数里发 IPC**：`App.tsx` 的另存/删除自定义模板把 `templatesSave` / `templatesDelete` 写在 `setCustomTemplates(prev => …)` 里，`main.tsx` 开着 StrictMode → dev 下更新函数双调用、真发两次 IPC。违反 AGENTS.md 第三节红线，因模板 id 是时间戳 upsert 才没产生重复数据。
+- **截图倍率语义**：`capture.ts` 的 `deviceScaleFactor: 2` 是硬编码（出图恒为 viewport 的 2 倍），与设置里的「导出倍率」是两件事，界面上没说清。
+- **冒烟的两条拦截分支依赖外网**：本机到 github.com 常 10s 上下顶到 8s 探测超时，近几轮里常出现 2 条 SKIP；要满覆盖得在 CI 里造一个可控的「拒绝内嵌」站点。
