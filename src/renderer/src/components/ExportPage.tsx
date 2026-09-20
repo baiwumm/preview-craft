@@ -11,11 +11,13 @@ export default function ExportPage(): ReactElement {
 
   useEffect(() => window.api.onExportRender(setPayload), []);
 
-  // 导出窗口页面必须透明（透明背景板导出无底 PNG），覆盖 index.html 的 bg-background
+  // 导出窗口页面必须透明（透明背景板导出无底 PNG），覆盖 index.html 的 bg-background。
+  // JPG 无 alpha：画布带圆角时四角是被裁掉的透明区，页面若不铺白会被渲染成黑角，故垫白跟随。
   useEffect(() => {
-    document.documentElement.style.background = 'transparent';
-    document.body.style.background = 'transparent';
-  }, []);
+    const bg = payload?.flattenWhite ? '#ffffff' : 'transparent';
+    document.documentElement.style.background = bg;
+    document.body.style.background = bg;
+  }, [payload?.flattenWhite]);
 
   // WebP 编码：PNG dataURL → OffscreenCanvas.convertToBlob
   useEffect(

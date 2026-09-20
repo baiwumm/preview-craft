@@ -1,4 +1,5 @@
 import { Button } from '@heroui/react';
+import { X } from 'lucide-react';
 import type { Template } from '@shared/types';
 import type { ReactElement } from 'react';
 
@@ -35,7 +36,7 @@ export default function TemplateGallery({
             active ? 'border-accent ring-accent ring-2' : 'border-transparent'
           }`}
         >
-          <ThumbCanvas template={template} scale={0.3} className="rounded-md" />
+          <ThumbCanvas template={template} className="rounded-md" />
           <p className="mt-1 truncate text-xs font-medium">{template.name}</p>
           <p className="text-muted truncate text-[10px]">
             {isCustom ? '自定义' : template.subtitle}
@@ -50,7 +51,7 @@ export default function TemplateGallery({
             className="absolute -top-1 -right-1"
             onPress={() => onDeleteCustom(template.id)}
           >
-            ✕
+            <X />
           </Button>
         ) : null}
       </div>

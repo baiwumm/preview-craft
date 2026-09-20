@@ -14,7 +14,7 @@ export interface StyleState {
 }
 
 export const defaultStyle: StyleState = {
-  borderRadius: 0,
+  borderRadius: 12,
   shadow: true,
   zoom: 1,
   customFrom: '#ff9a3d',
