@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { BrowserWindow, ipcMain } from 'electron';
@@ -12,9 +12,22 @@ import { shotCacheDir } from './capture';
 
 const EXPORT_HTML = join(__dirname, '../renderer/index.html');
 
+/**
+ * 截图与导出产物的读取边界：这些 IPC 通道由渲染进程给一个绝对路径就返回内容，
+ * 而渲染进程里嵌的是任意远程站点，因此把可读范围锁死在本应用的临时产物目录。
+ */
+export function assertShotPath(path: string): string {
+  const dir = resolve(shotCacheDir());
+  const full = resolve(path);
+  if (!full.startsWith(dir + sep)) {
+    throw new Error('路径不在截图缓存目录内，已拒绝');
+  }
+  return full;
+}
+
 /** 读取截图文件并转为 dataURL */
 export async function shotToDataUrl(path: string): Promise<string> {
-  const buffer = await readFile(path);
+  const buffer = await readFile(assertShotPath(path));
   return `data:image/png;base64,${buffer.toString('base64')}`;
 }
 
