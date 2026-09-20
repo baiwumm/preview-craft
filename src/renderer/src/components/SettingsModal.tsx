@@ -8,6 +8,18 @@ import {
   Select,
   Tabs
 } from '@heroui/react';
+import {
+  Check,
+  Circle,
+  CircleArrowUp,
+  Eraser,
+  ExternalLink,
+  FolderOpen,
+  RefreshCw,
+  ScanSearch,
+  Trash2,
+  X
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -241,6 +253,8 @@ export default function SettingsModal({
                             variant={settings.browserPath === browser.path ? 'primary' : 'tertiary'}
                             onPress={() => onPatch({ browserPath: browser.path })}
                           >
+                            {/* 选中与否各配一枚图标，避免只有一态带图标造成宽度跳动 */}
+                            {settings.browserPath === browser.path ? <Check /> : <Circle />}
                             {settings.browserPath === browser.path ? '已选' : '使用'}
                           </Button>
                         </div>
@@ -250,6 +264,7 @@ export default function SettingsModal({
 
                   <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="secondary" onPress={onPickBrowser}>
+                      <FolderOpen />
                       浏览…
                     </Button>
                     <Button
@@ -258,9 +273,11 @@ export default function SettingsModal({
                       isDisabled={!settings.browserPath}
                       onPress={() => onPatch({ browserPath: undefined })}
                     >
+                      <Eraser />
                       清除覆盖
                     </Button>
                     <Button size="sm" variant="tertiary" onPress={onDetectBrowsers}>
+                      <ScanSearch />
                       重新检测
                     </Button>
                   </div>
@@ -358,9 +375,11 @@ export default function SettingsModal({
                       onPress={handleClearCache}
                       isDisabled={clearing || (cache?.files ?? 0) === 0}
                     >
+                      <Trash2 />
                       {clearing ? '清理中…' : '清除缓存'}
                     </Button>
                     <Button size="sm" variant="tertiary" onPress={loadCache}>
+                      <RefreshCw />
                       刷新
                     </Button>
                   </div>
@@ -385,6 +404,7 @@ export default function SettingsModal({
                       isDisabled={checking}
                       onPress={handleCheckUpdate}
                     >
+                      <CircleArrowUp />
                       {checking ? '检查中…' : '检查更新'}
                     </Button>
                     {update?.ok && update.hasUpdate ? (
@@ -395,6 +415,7 @@ export default function SettingsModal({
                           if (update.url) onOpenRelease(update.url);
                         }}
                       >
+                        <ExternalLink />
                         前往下载
                       </Button>
                     ) : null}
@@ -413,6 +434,7 @@ export default function SettingsModal({
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">
+                <X />
                 关闭
               </Button>
             </Modal.Footer>

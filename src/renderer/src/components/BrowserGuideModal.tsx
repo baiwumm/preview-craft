@@ -1,4 +1,5 @@
 import { Button, Modal, ProgressBar } from '@heroui/react';
+import { Clock, FolderOpen } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 import ChromiumDownloadButton from './ChromiumDownloadButton';
@@ -81,9 +82,11 @@ export default function BrowserGuideModal({
             </Modal.Body>
             <Modal.Footer className="flex-wrap">
               <Button variant="ghost" onPress={onDismiss}>
+                <Clock />
                 稍后再说
               </Button>
               <Button variant="secondary" onPress={onOpenSettings}>
+                <FolderOpen />
                 指定浏览器路径
               </Button>
               <ChromiumDownloadButton downloading={downloading} onStart={onDownload} variant="primary" />

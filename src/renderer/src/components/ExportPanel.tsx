@@ -1,4 +1,5 @@
-import { Button, Label, ListBox, ProgressBar, Select,Description } from '@heroui/react';
+import { Button, Description, Label, ListBox, ProgressBar, Select, Spinner } from '@heroui/react';
+import { Camera, Download } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 import type { ExportFormat } from '@shared/types';
@@ -99,9 +100,11 @@ export default function ExportPanel({
         onPress={onCapture}
         isDisabled={!canExport || exporting !== null}
       >
+        {exporting?.phase === 'capturing' ? <Spinner /> : <Camera />}
         {exporting?.phase === 'capturing' ? '截取中…' : '仅截图'}
       </Button>
       <Button variant="primary" onPress={onExport} isDisabled={!canExport || exporting !== null}>
+        {exporting ? <Spinner /> : <Download />}
         {exporting
           ? exporting.phase === 'capturing'
             ? '截取中…'

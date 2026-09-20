@@ -3,6 +3,7 @@ import type { EmbedProbeResult, Placement } from '@shared/types';
 import type { CSSProperties, ReactElement } from 'react';
 
 import { Button } from '@heroui/react';
+import { RotateCw } from 'lucide-react';
 
 import { deviceShadow } from '@/lib/design';
 
@@ -86,6 +87,7 @@ export default function DeviceFrame({
             </span>
             {onRetry ? (
               <Button size="sm" variant="primary" onPress={onRetry}>
+                <RotateCw />
                 重试
               </Button>
             ) : null}

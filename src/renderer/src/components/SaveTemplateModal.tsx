@@ -1,4 +1,5 @@
 import { Button, Input, Label, Modal, TextField } from '@heroui/react';
+import { Save, X } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -50,9 +51,11 @@ export default function SaveTemplateModal({
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="tertiary">
+                <X />
                 取消
               </Button>
               <Button variant="primary" onPress={handleSave} isDisabled={!name.trim()}>
+                <Save />
                 保存
               </Button>
             </Modal.Footer>

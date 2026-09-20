@@ -1,4 +1,5 @@
 import { Accordion, Button, Input, TextField } from '@heroui/react';
+import { Camera, Moon, RefreshCw, Settings, Sun } from 'lucide-react';
 import { useCallback, useImperativeHandle, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactElement, Ref } from 'react';
 
@@ -128,15 +129,20 @@ export default function UrlBar({
           />
         </TextField>
         <Button variant="primary" isDisabled={busy} onPress={() => submit(mainDraft, deviceDrafts, false)}>
+          <RefreshCw />
           刷新预览
         </Button>
         <Button variant="secondary" isDisabled={busy} onPress={onCapture} aria-label="截图（Ctrl+Enter）">
+          <Camera />
           截图
         </Button>
         <Button variant="ghost" isDisabled={busy} onPress={onOpenSettings} aria-label="打开设置">
+          <Settings />
           设置
         </Button>
         <Button variant="ghost" onPress={onToggleTheme} aria-label="切换明暗主题">
+          {/* 图标与文案都指向「要切去的那一档」，暗色下显示太阳 = 切到浅色 */}
+          {theme === 'dark' ? <Sun /> : <Moon />}
           {theme === 'dark' ? '浅色' : '深色'}
         </Button>
       </div>

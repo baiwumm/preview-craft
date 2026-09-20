@@ -1,4 +1,5 @@
 import { Button, ColorField, ColorSwatch, ColorSwatchPicker, Label, parseColor, Slider, Switch, Description } from '@heroui/react';
+import { Palette, RotateCcw, Save } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
@@ -184,6 +185,7 @@ export default function StylePanel({
             }))
           }
         >
+          <Palette />
           应用自定义渐变
         </Button>
       </Section>
@@ -330,9 +332,11 @@ export default function StylePanel({
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
         <Button variant="primary" onPress={onSaveAsTemplate}>
+          <Save />
           另存为模板
         </Button>
         <Button variant="tertiary" onPress={onResetPreset} isDisabled={!canReset}>
+          <RotateCcw />
           还原预设
         </Button>
         </div>

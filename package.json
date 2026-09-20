@@ -21,6 +21,7 @@
     "@heroui/styles": "^3.2.5",
     "@puppeteer/browsers": "^3.2.2",
     "electron-store": "^11.0.2",
+    "lucide-react": "^1.47.0",
     "puppeteer-core": "^25.11.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

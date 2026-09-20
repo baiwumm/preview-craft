@@ -1,4 +1,5 @@
-import { Button } from '@heroui/react';
+import { Button, Spinner } from '@heroui/react';
+import { CircleAlert, Download, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -40,6 +41,7 @@ export default function ChromiumDownloadButton({
   if (downloading) {
     return (
       <Button size={size} variant={variant} isDisabled>
+        <Spinner />
         下载中…
       </Button>
     );
@@ -48,6 +50,7 @@ export default function ChromiumDownloadButton({
   if (!pending) {
     return (
       <Button size={size} variant={variant} onPress={() => setPending(true)}>
+        <Download />
         下载 Chromium
       </Button>
     );
@@ -63,9 +66,11 @@ export default function ChromiumDownloadButton({
           onStart();
         }}
       >
+        <CircleAlert />
         确认下载（约 150 MB，无法中途取消）
       </Button>
       <Button size={size} variant="tertiary" onPress={() => setPending(false)}>
+        <X />
         取消
       </Button>
     </div>
