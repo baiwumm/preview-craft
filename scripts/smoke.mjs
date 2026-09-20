@@ -602,6 +602,65 @@ async function runAppSection() {
     const detection = await api('browserDetect');
     check('browserDetect 命中本机浏览器', detection.found.length > 0 && detection.found.every((b) => existsSync(b.path)), detection.found.map((b) => `${b.kind}:${b.path.slice(-26)}`).join(' '));
 
+    /* --- 1b. 渲染→主进程边界：这几个通道都会真实读文件 / 发请求，越界输入必须被主进程挡下 --- */
+    const outside = join(ROOT, 'package.json');
+    const rejectMessage = async (name, ...args) => {
+      try {
+        await api(name, ...args);
+        return null;
+      } catch (error) {
+        return String(error?.message ?? error);
+      }
+    };
+    const deniedRead = await rejectMessage('shotDataUrl', outside);
+    check('shotDataUrl 拒绝缓存目录外的路径', deniedRead !== null && /缓存目录/.test(deniedRead), deniedRead ?? '未拒绝');
+    const deniedClip = await rejectMessage('exportClipboard', { path: outside });
+    check('exportClipboard 拒绝缓存目录外的路径', deniedClip !== null && /缓存目录/.test(deniedClip), deniedClip ?? '未拒绝');
+    const deniedCapture = await rejectMessage('captureStart', {
+      url: 'file:///C:/Windows/win.ini',
+      deviceUrls: {},
+      devices: ['desktop']
+    });
+    check(
+      'captureStart 主进程侧拒绝非 http(s) 地址',
+      deniedCapture !== null && /地址无效/.test(deniedCapture),
+      deniedCapture ?? '未拒绝'
+    );
+    const deniedProbe = await rejectMessage('previewProbe', 'file:///C:/Windows/win.ini');
+    check('previewProbe 主进程侧拒绝非 http(s) 地址', deniedProbe !== null && /地址无效/.test(deniedProbe), deniedProbe ?? '未拒绝');
+    // 设备屏里嵌的是任意远程站点：子帧 window.open 弹出的窗口会继承本窗口 webPreferences
+    // （含 preload），一旦放行就等于把整套 window.api 交给外部页面。这里要求它开不出来。
+    const popup = await page.evaluate(() => window.open('https://example.com'));
+    check('顶层 window.open 被拦截（不产生带 bridge 的新窗口）', popup === null, String(popup));
+
+    /* --- 1c. 浏览器实例生命周期：一次 launch 失败不能把之后所有截图永久锁死 ---
+       指向一个存在但不是浏览器的可执行文件 → launch 必然失败；改回自动检测后必须还能截出来。
+       旧实现在这里会把 rejected promise 缓存住，之后每次截图都返回同一个错误，只能重启应用。 */
+    const notABrowser = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'where.exe');
+    await api('settingsSet', { browserPath: notABrowser });
+    const launchFailure = await rejectMessage('captureStart', { url: SITE, deviceUrls: {}, devices: ['desktop'] });
+    check('浏览器启动失败会如实报错', launchFailure !== null, launchFailure?.slice(0, 90) ?? '未报错');
+    await api('settingsSet', { browserPath: '' });
+    const afterBadLaunch = await soft('launch 失败后重新截图', () =>
+      api('captureStart', { url: SITE, deviceUrls: {}, devices: ['desktop'] })
+    );
+    check(
+      'launch 失败不锁死引擎，下一次截图仍成功',
+      Boolean(afterBadLaunch?.shots?.desktop),
+      JSON.stringify(afterBadLaunch?.errors ?? {})
+    );
+
+    /* 单台重试没有遮罩可挡，主进程必须拦住并发的第二轮：两条 captureStart 共用一个浏览器
+       实例并发导航，后完成的那台会覆盖先完成的结果，画布拿到的是错位的截图。 */
+    const [firstShot, secondShot] = await page.evaluate(async (site) => {
+      const run = (device) =>
+        window.api
+          .captureStart({ url: site, deviceUrls: {}, devices: [device] })
+          .then(() => 'ok', (error) => String(error.message ?? error));
+      return Promise.all([run('desktop'), run('mobile')]);
+    }, SITE);
+    check('并发 captureStart 被主进程互斥挡下', firstShot === 'ok' && /还在进行中/.test(secondShot), `${firstShot} | ${secondShot}`);
+
     /* --- 2. 预览：非法 URL / 主 URL / 分设备覆盖 --- */
     await page.bringToFront();
     const urlInput = 'input[placeholder^="输入网址"]';
@@ -879,6 +938,34 @@ async function runAppSection() {
     } else {
       check('另存为模板写入存储', false, '未找到「另存为模板」按钮');
     }
+
+    /* 换地址必须清掉上一轮的截图：DeviceFrame 优先渲染 shot，留着就是旧站画面盖住新预览，
+       此时直接导出会把 A 站的图配上新排版、还全程不报错。放在第 7 段之后，避免打掉
+       「切模板后截图数量随 placements 变化」那组依赖画布截图的断言。 */
+    await typeInto(page, urlInput, 'example.com');
+    await page.keyboard.press('Enter');
+    await waitTrue(
+      '等换地址后旧截图让位',
+      () => document.querySelectorAll('main img').length === 0 && document.querySelectorAll('main iframe').length === 4,
+      undefined,
+      20_000
+    );
+    state = await canvasState(page);
+    check(
+      '改地址后旧截图让位给新预览',
+      state.images.length === 0 && state.frames.length === 4 && state.frames.every((f) => f.src.includes('example.com')),
+      `img ${state.images.length}，iframe ${state.frames.length}/4`
+    );
+    await typeInto(page, urlInput, SITE.replace(/^https:\/\//, ''));
+    await page.keyboard.press('Enter');
+    await waitTrue(
+      '等预览回到主站点',
+      () =>
+        document.querySelectorAll('main iframe').length === 4 &&
+        [...document.querySelectorAll('main iframe')].every((f) => f.src.includes('github.com')),
+      undefined,
+      30_000
+    );
 
     /* --- 8. UI：设置弹窗 / 主题 / 设置持久化 --- */
     await closeAllDialogs(page);
