@@ -89,3 +89,5 @@ preview-craft/
 - **每阶段完成必须**：① `pnpm typecheck` 与 `pnpm lint` 零错误；② 跑通 PLAN.md 中该阶段的「自验」；③ 勾选 PLAN.md「进度追踪」对应项并补一行执行记录。
 - **遇到方案级分歧**（技术选型、目录调整、依赖变更）：停下记录到 PLAN.md「待确认」节，不得擅自定夺。
 - 依赖安装前先确认 `.npmrc` 的 Electron 镜像配置存在（国内网络环境）。
+- **出包 hygiene**：每次出新安装包，删除 `release/` 内被取代的旧安装包与 `.blockmap`，只保留最新一份（已发布版本在 GitHub Release 上有存档，本地不留）。
+- **依赖归类**：只被 Vite 打进 renderer 的包（图标库、React 生态等）一律放 `devDependencies` —— electron-builder 会把 `dependencies` 的整棵子树塞进 `app.asar`（`lucide-react` 实测 +8.4 MiB）。主进程运行时真正需要的只有 `electron-store`、`puppeteer-core`、`@puppeteer/browsers`。
