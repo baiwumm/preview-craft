@@ -48,6 +48,13 @@ function resolveStartupTemplate(
   return { template, source };
 }
 
+/** 从按设备归并的会话状态里摘掉指定几台 */
+function dropDevices<T>(map: Partial<Record<DeviceId, T>>, devices: DeviceId[]): Partial<Record<DeviceId, T>> {
+  const next = { ...map };
+  for (const device of devices) delete next[device];
+  return next;
+}
+
 export default function App(): ReactElement {
   const { theme, toggleTheme } = useTheme();
 
@@ -86,6 +93,8 @@ export default function App(): ReactElement {
   const [embedHints, setEmbedHints] = useState<Record<string, EmbedProbeResult>>({});
 
   const urlBarRef = useRef<UrlBarHandle>(null);
+  /** 正在单台重试的设备，用来挡连点与「全量截图进行中点重试」 */
+  const retryingDevices = useRef<Set<DeviceId>>(new Set());
 
   const detectBrowsers = useCallback(() => {
     window.api
@@ -186,14 +195,20 @@ export default function App(): ReactElement {
 
   const handleApply = useCallback(
     (nextMain: string, nextDeviceUrls: Partial<Record<DeviceId, string>>) => {
-      // 仅在地址真的变了时清掉失败占位：UrlBar 失焦也会提交同值，无条件清会让
-      // 「重试」入口在截图失败后凭空消失，而改地址后又残留上一轮的失败块。
-      const changed =
-        nextMain !== mainUrl ||
-        deviceIds.some((device) => (nextDeviceUrls[device] ?? '') !== (deviceUrls[device] ?? ''));
+      // 每台设备实际用的地址是「自己的覆盖 || 主地址」，只有实际地址变了的台才算过期。
+      // 按同值提交（UrlBar 失焦会以同值二次提交）算出来是空集，所以既不会在截图失败后
+      // 凭空抹掉「重试」入口，也不会留下上一个站的画面继续盖住新预览 —— 后者更糟：
+      // DeviceFrame 优先渲染 shot，此时直接导出会把旧图配成新排版且毫不报错。
+      const stale = deviceIds.filter(
+        (device) => (deviceUrls[device] || mainUrl) !== (nextDeviceUrls[device] || nextMain)
+      );
       setMainUrl(nextMain);
       setDeviceUrls(nextDeviceUrls);
-      if (changed) setShotErrors({});
+      if (stale.length) {
+        setShotErrors((prev) => dropDevices(prev, stale));
+        setShots((prev) => dropDevices(prev, stale));
+        setShotPaths((prev) => dropDevices(prev, stale));
+      }
       probeEmbedding([nextMain, ...Object.values(nextDeviceUrls)]);
     },
     [mainUrl, deviceUrls, probeEmbedding]
@@ -456,7 +471,10 @@ export default function App(): ReactElement {
   /** 单台重试失败设备的截图 */
   const handleRetryDevice = useCallback(
     async (device: DeviceId) => {
-      if (!mainUrl) return;
+      // 重试不盖遮罩，所以自己挡并发：全量截图进行中点重试、或连点两次同一个重试，
+      // 都会开出两条 captureStart，后完成的那台把先完成的结果覆盖掉。
+      if (!mainUrl || !window.api || job || retryingDevices.current.has(device)) return;
+      retryingDevices.current.add(device);
       try {
         const result = await window.api.captureStart({
           url: mainUrl,
@@ -483,9 +501,11 @@ export default function App(): ReactElement {
         const message = describeCaptureError(error instanceof Error ? error.message : String(error));
         setShotErrors((prev) => ({ ...prev, [device]: message }));
         toast(`${devicePresets[device].label}截图失败：${message}`, { variant: 'danger' });
+      } finally {
+        retryingDevices.current.delete(device);
       }
     },
-    [mainUrl, deviceUrls]
+    [mainUrl, deviceUrls, job]
   );
 
   /** Ctrl+V：焦点不在输入区时，把剪贴板文本贴进地址栏并刷新预览 */

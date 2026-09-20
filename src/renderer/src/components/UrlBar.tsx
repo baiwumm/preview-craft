@@ -47,6 +47,9 @@ export default function UrlBar({
   /** 校验并提交：主 URL 非空时必须合法；分设备 URL 非空时必须合法，否则回落主地址 */
   const submit = useCallback(
     (mainText: string, drafts: Partial<Record<DeviceId, string>>, allowEmpty: boolean) => {
+      // 任务进行中三个顶栏按钮已禁用，回车与失焦提交是同一个入口留下的两条旁路；
+      // 放行会让在途截图把结果写进换过地址的会话里。
+      if (busy) return;
       if (!mainText.trim()) {
         if (!allowEmpty) {
           setError('请输入网址');
@@ -82,7 +85,7 @@ export default function UrlBar({
       });
       onApply(normalizedMain, normalizedDevices);
     },
-    [onApply]
+    [onApply, busy]
   );
 
   const handleMainKeyDown = useCallback(
