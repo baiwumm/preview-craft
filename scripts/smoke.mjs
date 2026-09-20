@@ -440,7 +440,7 @@ async function runLogicSection() {
   check('isTemplateModified 识别排版改动', isTemplateModified(cloned, original) === true && isTemplateModified(cloneTemplate(original), original) === false);
   check('isTemplateModified 无来源时判未改', isTemplateModified(cloned, undefined) === false);
   check('buildCustomBackground 生成 custom 前缀', buildCustomBackground('#aaa', '#bbb') === 'custom:linear-gradient(135deg, #aaa, #bbb)');
-  check('会话默认样式基线', defaultStyle.borderRadius === 0 && defaultStyle.shadow === true && defaultStyle.zoom === 1);
+  check('会话默认样式基线', defaultStyle.borderRadius === 12 && defaultStyle.shadow === true && defaultStyle.zoom === 1, `圆角=${defaultStyle.borderRadius}`);
 
   check('错误归因·超时', describeCaptureError('Navigation timeout of 30000 ms exceeded').includes('加载超时'));
   check('错误归因·DNS', describeCaptureError('net::ERR_NAME_NOT_RESOLVED').includes('域名无法解析'));
@@ -940,6 +940,21 @@ async function runAppSection() {
       check('样式（圆角/无阴影/缩放）导出成功', info.width === 2240 && info.height === 1740 && (await readFile(path)).length > 25_000, `${info.width}x${info.height}`);
     } catch (error) {
       check('样式（圆角/无阴影/缩放）导出成功', false, error instanceof Error ? error.message : String(error));
+    }
+
+    // 默认圆角 12 之后，画布四角是裁掉的透明区；JPG 没有 alpha，页面底色不铺白就会渲染成黑角。
+    // 阈值取 235 而非 250：圆角边缘紧邻渐变，JPG 色度抽样会让最暗通道掉到 247 左右。
+    try {
+      const { path } = await compose(classic, 2, 'jpg', { style: { borderRadius: 32, shadow: true, zoom: 1 } });
+      await copyFile(path, join(OUT_DIR, 'rounded-flatten.jpg'));
+      const info = await inspectImage(page, path);
+      check(
+        '画布圆角 + JPG 四角垫白不露黑',
+        info.corners.every((c) => c.r > 235 && c.g > 235 && c.b > 235),
+        info.corners.map((c) => `${c.r},${c.g},${c.b}`).join(' | ')
+      );
+    } catch (error) {
+      check('画布圆角 + JPG 四角垫白不露黑', false, error instanceof Error ? error.message : String(error));
     }
 
     try {
