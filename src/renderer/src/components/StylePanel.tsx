@@ -1,11 +1,18 @@
-import { Button, ColorField, ColorSwatch, Label, parseColor, Slider, Switch,Description } from '@heroui/react';
+import { Button, ColorField, ColorSwatch, ColorSwatchPicker, Label, parseColor, Slider, Switch, Description } from '@heroui/react';
 import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
 import { devicePresets } from '@shared/devices';
 import type { DeviceId, Placement, Template } from '@shared/types';
 
-import { backgrounds, isTransparentBackground, CHECKER_CSS } from '@templates/backgrounds';
+import {
+  CHECKER_CSS,
+  getBackground,
+  groupedBackgrounds,
+  groupNames,
+  isTransparentBackground,
+  type BackgroundPreset
+} from '@templates/backgrounds';
 
 import { buildCustomBackground, isCustomBackground, type StyleState } from '@/lib/design';
 
@@ -15,6 +22,23 @@ function toColor(hex: string) {
   } catch {
     return null;
   }
+}
+
+/** 组内没有命中项时的哨兵色：不属于任何一块背景板，整组即为未选中态 */
+const PICKER_UNSET = '#010203ff';
+
+/** 选中态以代表色的 hexa 为唯一 key，两边归一化后才能比对 */
+function toHexa(color: string): string {
+  try {
+    return parseColor(color).toString('hexa');
+  } catch {
+    return '';
+  }
+}
+
+/** 色块展示用 CSS：渐变底直接铺真实值，透明底铺棋盘格 */
+function swatchCss(bg: BackgroundPreset): string {
+  return isTransparentBackground(bg.key) ? CHECKER_CSS : bg.value;
 }
 
 interface SectionProps {
@@ -69,36 +93,41 @@ export default function StylePanel({
   return (
     <div className="flex flex-col gap-4">
       <Section title="背景">
-        <div className="grid grid-cols-3 gap-2">
-          {backgrounds.map((bg) => {
-            const active = template.background === bg.key;
-            return (
-              <button
-                key={bg.key}
-                type="button"
-                onClick={() => onTemplateChange((t) => ({ ...t, background: bg.key }))}
-                className={`cursor-pointer rounded-lg border p-1 transition-all ${
-                  active ? 'border-accent ring-accent ring-2' : 'border-separator'
-                }`}
-                title={bg.name}
+        {groupedBackgrounds().map(([group, list]) => {
+          const selected = list.find((bg) => bg.key === template.background);
+          return (
+            <div key={group} className="flex flex-col gap-1.5">
+              <p className="text-muted text-[10px] font-medium">{groupNames[group]}</p>
+              <ColorSwatchPicker
+                aria-label={`背景板 · ${groupNames[group]}`}
+                variant="square"
+                size="xl"
+                value={selected?.color ?? PICKER_UNSET}
+                onChange={(color) => {
+                  const hit = list.find((bg) => toHexa(bg.color) === color.toString('hexa'));
+                  if (hit) onTemplateChange((t) => ({ ...t, background: hit.key }));
+                }}
               >
-                <span
-                  className="block h-6 w-full rounded"
-                  style={{
-                    background: isTransparentBackground(bg.key) ? CHECKER_CSS : bg.value
-                  }}
-                  aria-hidden
-                />
-                <span className="text-foreground mt-1 block text-center text-[10px]">
-                  {bg.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        {isCustomBackground(template.background) ? (
-          <p className="text-muted text-xs">自定义渐变已应用</p>
-        ) : null}
+                {list.map((bg) => (
+                  <ColorSwatchPicker.Item
+                    key={bg.key}
+                    color={bg.color}
+                    aria-label={bg.name}
+                  >
+                    <ColorSwatchPicker.Swatch style={{ background: swatchCss(bg) }} />
+                    <ColorSwatchPicker.Indicator />
+                  </ColorSwatchPicker.Item>
+                ))}
+              </ColorSwatchPicker>
+            </div>
+          );
+        })}
+        <p className="text-muted text-xs">
+          当前：
+          {isCustomBackground(template.background)
+            ? '自定义渐变'
+            : getBackground(template.background).name}
+        </p>
         <div className="flex items-center gap-2">
           <ColorField
             aria-label="渐变起始色"

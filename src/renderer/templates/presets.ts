@@ -3,18 +3,23 @@ import type { Template } from '@shared/types';
 /** 画布基准 1120 × 870，所有坐标基于此 */
 export const CANVAS_BASE = { width: 1120, height: 870 } as const;
 
+/**
+ * 五套预设共用的光学口径（冒烟 A 段按同一口径断言，改坐标即被校验）：
+ * 内容包围盒水平居中偏差 ≤10px、四周留白 ≥ 画布对应边的 7~8%、
+ * 后景设备屏幕被前景压住的面积 ≤12% —— 全家福这类多设备构图一旦超过就糊成一团。
+ */
 export const presets: Template[] = [
   {
     id: 'classic',
     name: '经典全家福',
     subtitle: '四种屏幕，一个好故事',
     canvas: { ...CANVAS_BASE },
-    background: 'twilight',
+    background: 'sunset-flare',
     placements: [
-      { device: 'desktop', x: 285, y: 140, width: 620 },
-      { device: 'laptop', x: 65, y: 420, width: 510 },
-      { device: 'tablet', x: 815, y: 290, width: 240 },
-      { device: 'mobile', x: 675, y: 465, width: 135 }
+      { device: 'desktop', x: 220, y: 70, width: 660 },
+      { device: 'laptop', x: 110, y: 505, width: 470 },
+      { device: 'tablet', x: 815, y: 300, width: 210 },
+      { device: 'mobile', x: 680, y: 498, width: 140 }
     ]
   },
   {
@@ -22,10 +27,10 @@ export const presets: Template[] = [
     name: '双屏聚焦',
     subtitle: '桌面与移动，恰到好处',
     canvas: { ...CANVAS_BASE },
-    background: 'sea-salt',
+    background: 'grape-soda',
     placements: [
-      { device: 'desktop', x: 160, y: 100, width: 760 },
-      { device: 'mobile', x: 790, y: 310, width: 170 }
+      { device: 'desktop', x: 155, y: 155, width: 700 },
+      { device: 'mobile', x: 785, y: 372, width: 170 }
     ]
   },
   {
@@ -33,12 +38,12 @@ export const presets: Template[] = [
     name: '有序陈列',
     subtitle: '清晰展示每一种尺寸',
     canvas: { ...CANVAS_BASE },
-    background: 'mint',
+    background: 'glacier',
     placements: [
-      { device: 'desktop', x: 25, y: 240, width: 390 },
-      { device: 'laptop', x: 415, y: 355, width: 335 },
-      { device: 'tablet', x: 765, y: 255, width: 180 },
-      { device: 'mobile', x: 980, y: 320, width: 115 }
+      { device: 'desktop', x: 92, y: 304, width: 340 },
+      { device: 'laptop', x: 454, y: 390.7, width: 300 },
+      { device: 'tablet', x: 776, y: 394.5, width: 130 },
+      { device: 'mobile', x: 928, y: 368, width: 98 }
     ]
   },
   {
@@ -46,11 +51,11 @@ export const presets: Template[] = [
     name: '灵感错落',
     subtitle: '轻盈旋转，更有表达',
     canvas: { ...CANVAS_BASE },
-    background: 'cream',
+    background: 'cotton-candy',
     placements: [
-      { device: 'laptop', x: 100, y: 255, width: 640, rotation: -8 },
-      { device: 'tablet', x: 810, y: 170, width: 240, rotation: 8 },
-      { device: 'mobile', x: 700, y: 455, width: 135, rotation: -8 }
+      { device: 'laptop', x: 132, y: 230, width: 580, rotation: -8 },
+      { device: 'tablet', x: 764, y: 146, width: 225, rotation: 8 },
+      { device: 'mobile', x: 642, y: 453, width: 145, rotation: -10 }
     ]
   },
   {
@@ -60,8 +65,8 @@ export const presets: Template[] = [
     canvas: { ...CANVAS_BASE },
     background: 'obsidian',
     placements: [
-      { device: 'tablet', x: 300, y: 130, width: 355 },
-      { device: 'mobile', x: 660, y: 260, width: 205 }
+      { device: 'tablet', x: 205, y: 111.6, width: 490 },
+      { device: 'mobile', x: 630, y: 162, width: 295 }
     ]
   }
 ];

@@ -4,6 +4,8 @@ import type { CSSProperties, ReactElement } from 'react';
 
 import { Button } from '@heroui/react';
 
+import { deviceShadow } from '@/lib/design';
+
 import DeviceShellArt from './DeviceShell';
 
 interface DeviceFrameProps {
@@ -36,7 +38,7 @@ export default function DeviceFrame({
   onRetry
 }: DeviceFrameProps): ReactElement {
   const preset = devicePresets[placement.device];
-  const { aspect, inner, screenRadius } = preset.frame;
+  const { aspect, inner, screenRadius, shell } = preset.frame;
 
   const displayWidth = placement.width;
   const displayHeight = displayWidth / aspect;
@@ -65,7 +67,7 @@ export default function DeviceFrame({
         width: displayWidth,
         height: displayHeight,
         transform: placement.rotation ? `rotate(${placement.rotation}deg)` : undefined,
-        filter: shadow ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.35))' : undefined
+        filter: shadow ? deviceShadow(displayWidth) : undefined
       }}
     >
       <DeviceShellArt device={placement.device} k={k} />
@@ -115,6 +117,29 @@ export default function DeviceFrame({
               </div>
             ) : null}
           </>
+        ) : null}
+        {/* 玻璃压边：让内屏读起来是嵌进机身的玻璃，而不是贴在壳上的白块 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            borderRadius: screenRadius * k,
+            boxShadow: `inset 0 0 0 ${Math.max(0.6, k)}px rgba(0, 0, 0, 0.55)`
+          }}
+        />
+        {shell.island ? (
+          <div
+            aria-hidden
+            className="absolute"
+            style={{
+              left: (shell.island.x - inner.x) * k,
+              top: (shell.island.y - inner.y) * k,
+              width: shell.island.w * k,
+              height: shell.island.h * k,
+              borderRadius: shell.island.r * k,
+              background: 'linear-gradient(180deg, #1b1b22, #0a0a0e)'
+            }}
+          />
         ) : null}
       </div>
     </div>

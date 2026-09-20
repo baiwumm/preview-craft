@@ -17,8 +17,8 @@ export const defaultStyle: StyleState = {
   borderRadius: 0,
   shadow: true,
   zoom: 1,
-  customFrom: '#ede6ff',
-  customTo: '#b5aff2'
+  customFrom: '#ff9a3d',
+  customTo: '#7b2ff7'
 };
 
 export function cloneTemplate(template: Template): Template {
@@ -33,8 +33,20 @@ export function isCustomBackground(key: string): boolean {
   return key.startsWith('custom:');
 }
 
+/**
+ * 设备投影：按显示宽分级、双层叠加（近距贴合 + 远距扩散）。
+ * 固定 blur 半径会让手机这类小尺寸设备"飘"在画布上，故随绝对显示宽折算；
+ * 上下限避免超大屏阴影糊成一团、超小屏几乎看不见。
+ */
+export function deviceShadow(displayWidth: number): string {
+  const s = Math.min(1.6, Math.max(0.45, displayWidth / 400));
+  const layer = (dy: number, blur: number, alpha: number) =>
+    `drop-shadow(0 ${(dy * s).toFixed(1)}px ${(blur * s).toFixed(1)}px rgba(8, 8, 18, ${alpha}))`;
+  return `${layer(5, 10, 0.18)} ${layer(18, 34, 0.26)}`;
+}
+
 export function buildCustomBackground(from: string, to: string): string {
-  return `custom:linear-gradient(180deg, ${from}, ${to})`;
+  return `custom:linear-gradient(135deg, ${from}, ${to})`;
 }
 
 /** 会话内排版是否与来源模板一致（用于「还原预设」按钮可用性） */
