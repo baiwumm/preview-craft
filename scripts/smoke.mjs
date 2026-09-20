@@ -293,6 +293,30 @@ async function runLogicSection() {
       return inner.x >= 0 && inner.y >= 0 && inner.x + inner.width <= shell.body.x + shell.body.w + 1 && inner.y + inner.height <= shell.body.y + shell.body.h + 1;
     })
   );
+  // 机身之上的部件画在内屏之下、内屏之上的开孔画在内屏裁剪层里，两者落点错了就等于白画
+  check(
+    '壳体 over 部件不与内屏相交',
+    deviceIds.every((id) => {
+      const { inner, shell } = devicePresets[id].frame;
+      return shell.over.every((p) => p.x >= inner.x + inner.width - 0.5 || p.x + p.w <= inner.x + 0.5 || p.y >= inner.y + inner.height - 0.5 || p.y + p.h <= inner.y + 0.5);
+    })
+  );
+  check(
+    '内屏开孔落在内屏内',
+    deviceIds.every((id) => {
+      const { inner, shell } = devicePresets[id].frame;
+      if (!shell.island) return true;
+      const i = shell.island;
+      return i.x >= inner.x && i.y >= inner.y && i.x + i.w <= inner.x + inner.width && i.y + i.h <= inner.y + inner.height;
+    })
+  );
+  check(
+    '支架部件不越出机身外接盒',
+    deviceIds.every((id) => {
+      const { frame } = devicePresets[id];
+      return frame.shell.under.every((p) => p.x >= -0.5 && p.x + p.w <= frame.width + 0.5 && p.y + p.h <= frame.width / frame.aspect + 0.5);
+    })
+  );
 
   check('预设 5 套且 id 唯一', presets.length === 5 && new Set(presets.map((t) => t.id)).size === 5, presets.map((t) => t.id).join(','));
   check('画布基准统一 1120×870', presets.every((t) => t.canvas.width === CANVAS_BASE.width && t.canvas.height === CANVAS_BASE.height));
@@ -316,8 +340,95 @@ async function runLogicSection() {
   check('仅 editorial 使用 rotation', presets.filter((t) => t.placements.some((p) => p.rotation)).map((t) => t.id).join(',') === 'editorial');
   check('背景 key 均有色板', presets.every((t) => backgrounds.some((b) => b.key === t.background)), presets.map((t) => t.background).join(','));
 
-  check('背景板 7 块含透明底', backgrounds.length === 7 && isTransparentBackground('transparent'));
-  check('resolveBackgroundCss 预设取色板', resolveBackgroundCss('twilight').startsWith('linear-gradient'));
+  /* --- 构图口径：光学留白 / 居中 / 画面占比 / 前景遮挡后景屏幕 --- */
+  const rectOf = (p, part) => {
+    const { frame } = devicePresets[p.device];
+    const k = p.width / frame.width;
+    const outerH = p.width / frame.aspect;
+    const box =
+      part === 'screen'
+        ? { x: frame.inner.x * k, y: frame.inner.y * k, w: frame.inner.width * k, h: frame.inner.height * k }
+        : { x: 0, y: 0, w: p.width, h: outerH };
+    return {
+      x: p.x + box.x,
+      y: p.y + box.y,
+      w: box.w,
+      h: box.h,
+      rot: p.rotation ?? 0,
+      // 旋转围绕机身外接盒中心（CSS transform-origin 默认 50% 50%），内屏要按同一轴心折算
+      ax: p.x + p.width / 2,
+      ay: p.y + outerH / 2
+    };
+  };
+  const aabb = (r) => {
+    const rad = (r.rot * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const dx = r.x + r.w / 2 - r.ax;
+    const dy = r.y + r.h / 2 - r.ay;
+    const cx = r.ax + dx * Math.cos(rad) - dy * Math.sin(rad);
+    const cy = r.ay + dx * Math.sin(rad) + dy * Math.cos(rad);
+    const w = r.w * cos + r.h * sin;
+    const h = r.w * sin + r.h * cos;
+    return { x1: cx - w / 2, y1: cy - h / 2, x2: cx + w / 2, y2: cy + h / 2 };
+  };
+  const inter = (a, b) => {
+    const w = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1);
+    const h = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);
+    return w <= 0 || h <= 0 ? 0 : w * h;
+  };
+
+  const flaws = [];
+  for (const t of presets) {
+    const boxes = t.placements.map((p) => aabb(rectOf(p, 'outer')));
+    const left = Math.min(...boxes.map((b) => b.x1));
+    const right = CANVAS_BASE.width - Math.max(...boxes.map((b) => b.x2));
+    const top = Math.min(...boxes.map((b) => b.y1));
+    const bottom = CANVAS_BASE.height - Math.max(...boxes.map((b) => b.y2));
+    if (left < 88 || right < 88 || top < 60 || bottom < 60) {
+      flaws.push(`${t.id} 留白不足 L${left.toFixed(0)}/R${right.toFixed(0)}/T${top.toFixed(0)}/B${bottom.toFixed(0)}`);
+    }
+    const offset = (left - right) / 2;
+    if (Math.abs(offset) > 10) flaws.push(`${t.id} 水平偏心 ${offset.toFixed(1)}px`);
+    if (Math.abs(top - bottom) > 34) flaws.push(`${t.id} 上下失衡 T${top.toFixed(0)}/B${bottom.toFixed(0)}`);
+    const fill = Math.max((CANVAS_BASE.width - left - right) / CANVAS_BASE.width, (CANVAS_BASE.height - top - bottom) / CANVAS_BASE.height);
+    if (fill < 0.68) flaws.push(`${t.id} 画面占比仅 ${(fill * 100).toFixed(0)}%`);
+    for (let i = 0; i < t.placements.length; i++) {
+      for (let j = i + 1; j < t.placements.length; j++) {
+        const screen = aabb(rectOf(t.placements[i], 'screen'));
+        const cover = aabb(rectOf(t.placements[j], 'outer'));
+        const ratio = inter(screen, cover) / ((screen.x2 - screen.x1) * (screen.y2 - screen.y1));
+        if (ratio > 0.12) {
+          flaws.push(`${t.id} ${t.placements[i].device} 屏幕被 ${t.placements[j].device} 压住 ${(ratio * 100).toFixed(0)}%`);
+        }
+      }
+    }
+  }
+  check('预设构图口径（留白/居中/占比/遮挡）', flaws.length === 0, flaws.join('；') || '五套全过');
+
+  const rowPreset = presets.find((t) => t.id === 'row');
+  const rowBottoms = rowPreset.placements.map((p) => p.y + p.width / devicePresets[p.device].frame.aspect);
+  check(
+    '有序陈列四台底边同一地平线',
+    Math.max(...rowBottoms) - Math.min(...rowBottoms) <= 0.6,
+    rowBottoms.map((b) => b.toFixed(1)).join('/')
+  );
+  const rowBoxes = rowPreset.placements
+    .map((p) => ({ x1: p.x, x2: p.x + p.width }))
+    .sort((a, b) => a.x1 - b.x1);
+  const rowGaps = rowBoxes.slice(1).map((b, i) => b.x1 - rowBoxes[i].x2);
+  check('有序陈列相邻设备等距且不相叠', rowGaps.every((g) => Math.abs(g - rowGaps[0]) < 0.6 && g > 0), rowGaps.join('/'));
+
+  check('背景板 15 块含透明底', backgrounds.length === 15 && isTransparentBackground('transparent'));
+  // ColorSwatchPicker 用代表色的 hexa 当选中 key，两块撞同色会同时高亮
+  check(
+    '背景板代表色互不相同',
+    new Set(backgrounds.map((b) => b.color)).size === backgrounds.length,
+    backgrounds.map((b) => b.color).join(',')
+  );
+  check('背景板每块都有可解析代表色', backgrounds.every((b) => /^#[0-9a-f]{6}$/i.test(b.color)));
+  check('resolveBackgroundCss 渐变底为多层', resolveBackgroundCss('sunset-flare').includes('radial-gradient') && resolveBackgroundCss('sunset-flare').includes('linear-gradient'));
+  check('resolveBackgroundCss 纯色底为单值', resolveBackgroundCss('white') === '#ffffff');
   check('resolveBackgroundCss 解析 custom 前缀', resolveBackgroundCss('custom:#111,#222') === '#111,#222');
   check('resolveBackgroundCss 未知 key 回落首块', resolveBackgroundCss('nope') === backgrounds[0].value);
   check('透明底仅 PNG 留空、JPG 垫白', resolveBackgroundCss('transparent') === 'transparent' && resolveBackgroundCss('transparent', true) === '#ffffff');
@@ -328,7 +439,7 @@ async function runLogicSection() {
   check('cloneTemplate 深拷贝不改源模板', original.placements[0].x !== cloned.placements[0].x && original.canvas !== cloned.canvas);
   check('isTemplateModified 识别排版改动', isTemplateModified(cloned, original) === true && isTemplateModified(cloneTemplate(original), original) === false);
   check('isTemplateModified 无来源时判未改', isTemplateModified(cloned, undefined) === false);
-  check('buildCustomBackground 生成 custom 前缀', buildCustomBackground('#aaa', '#bbb') === 'custom:linear-gradient(180deg, #aaa, #bbb)');
+  check('buildCustomBackground 生成 custom 前缀', buildCustomBackground('#aaa', '#bbb') === 'custom:linear-gradient(135deg, #aaa, #bbb)');
   check('会话默认样式基线', defaultStyle.borderRadius === 0 && defaultStyle.shadow === true && defaultStyle.zoom === 1);
 
   check('错误归因·超时', describeCaptureError('Navigation timeout of 30000 ms exceeded').includes('加载超时'));
@@ -896,6 +1007,34 @@ async function runAppSection() {
     await waitTrue('切到样式页签', tabSelected('样式'));
     const styleText = await bodyText(page);
     check('样式页含背景板与圆角/阴影控件', styleText.includes('背景') && styleText.includes('圆角') && styleText.includes('阴影'));
+    // 背景板走 HeroUI 内置 ColorSwatchPicker：选中态以代表色的 hexa 为唯一 key，
+    // 每组各一个 picker，故跨组互斥要靠「点选后全页只有一个 selected」来兜。
+    const picker = await page.evaluate(() => ({
+      groups: document.querySelectorAll('[data-slot="color-swatch-picker"]').length,
+      items: document.querySelectorAll('[data-slot="color-swatch-picker-item"]').length,
+      selected: document.querySelector('[data-slot="color-swatch-picker-item"][data-selected="true"]')?.getAttribute('aria-label') ?? null
+    }));
+    check('背景板为内置色板三组 15 块', picker.groups === 3 && picker.items === 15, `${picker.groups} 组 / ${picker.items} 块`);
+    check('色板初始选中模板自带背景', picker.selected === '落日熔金', String(picker.selected));
+    await tap(page, attrLocator('[data-slot="color-swatch-picker-item"]', 'aria-label', '曜石黑'));
+    await waitTrue(
+      '点选深色底后全页仅一项选中',
+      `document.querySelectorAll('[data-slot="color-swatch-picker-item"][data-selected="true"]').length === 1 && document.querySelector('[data-slot="color-swatch-picker-item"][data-selected="true"]')?.getAttribute('aria-label') === '曜石黑'`
+    );
+    const pickedBg = await page.evaluate(() => ({
+      hint: [...document.querySelectorAll('aside p')].map((e) => e.textContent?.trim()).find((t) => t?.startsWith('当前：')) ?? '',
+      board: (() => {
+        const box = [...document.querySelectorAll('main div[style]')].find((el) => el.style.borderRadius);
+        return box ? getComputedStyle(box).background : '';
+      })()
+    }));
+    check(
+      '点选色板即时改画布底色并回显名称',
+      pickedBg.hint === '当前：曜石黑' && pickedBg.board.includes('rgb(31, 31, 40)'),
+      `${pickedBg.hint} / ${pickedBg.board.slice(0, 60)}…`
+    );
+    await tap(page, attrLocator('[data-slot="color-swatch-picker-item"]', 'aria-label', '落日熔金'));
+    await waitTrue('切回模板自带背景', `document.querySelector('[data-slot="color-swatch-picker-item"][data-selected="true"]')?.getAttribute('aria-label') === '落日熔金'`);
     // HeroUI v3 Slider 的可聚焦控件是 input[type=range]（wrapper 只有 role=group），
     // 焦点若留在页签上按方向键会切换页签，必须先聚焦滑杆。
     const sliderFocused = await page.evaluate(() => {
