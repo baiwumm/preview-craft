@@ -313,14 +313,14 @@ export default function SettingsModal({
                 <Tabs.Panel id="defaults" className="flex flex-col gap-3 pt-3">
                   <SettingSelect
                     label="默认模板"
-                    hint="启动时自动套用该模板（排版微调仍会覆盖当前会话）"
+                    hint="仅在没有可恢复的上次会话时生效（排版微调等会话状态现在会记住）"
                     value={settings.defaultTemplate ?? NONE}
                     options={templateOptions}
                     onChange={(value) => onPatch({ defaultTemplate: value === NONE ? undefined : value })}
                   />
                   <SettingSelect
                     label="默认背景"
-                    hint="启动时覆盖模板自带背景"
+                    hint="覆盖模板自带背景；同样让位于上次会话恢复的背景"
                     value={settings.defaultBackground ?? NONE}
                     options={backgroundOptions}
                     onChange={(value) =>
@@ -381,6 +381,10 @@ export default function SettingsModal({
                     <Button size="sm" variant="tertiary" onPress={loadCache}>
                       <RefreshCw />
                       刷新
+                    </Button>
+                    <Button size="sm" variant="tertiary" onPress={() => void window.api?.cacheOpen?.()}>
+                      <FolderOpen />
+                      打开缓存目录
                     </Button>
                   </div>
                 </Tabs.Panel>

@@ -11,6 +11,8 @@ import { normalizeUrl } from '@shared/url';
 export interface UrlBarHandle {
   /** 写入并提交一个地址（Ctrl+V 粘贴到地址栏用） */
   applyText: (text: string) => void;
+  /** 启动恢复会话：主地址与分设备覆盖都要回填草稿，否则输入框显示的和实际用的不一致 */
+  restoreSession: (main: string, devices: Partial<Record<DeviceId, string>>) => void;
   /** 聚焦地址输入框 */
   focus: () => void;
 }
@@ -99,7 +101,13 @@ export default function UrlBar({
   useImperativeHandle(
     ref,
     () => ({
-      applyText: (text: string) => submit(text, deviceDrafts, false),
+      applyText: (text) => submit(text, deviceDrafts, false),
+      restoreSession: (main, devices) => {
+        setMainDraft(main);
+        setDeviceDrafts(devices);
+        // 有地址才提交；提交走正常链路，App 侧的 mainUrl / 预览 iframe 一并跟上
+        if (main) submit(main, devices, false);
+      },
       focus: () => inputRef.current?.focus()
     }),
     [submit, deviceDrafts]

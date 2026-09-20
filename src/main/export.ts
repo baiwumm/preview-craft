@@ -25,6 +25,38 @@ export function assertShotPath(path: string): string {
   return full;
 }
 
+/**
+ * 等指定渲染进程发来的一次性回执，成功与超时两条路径都摘掉监听器。
+ *
+ * 原先用 ipcMain.once：超时胜出时监听器留在原地，下一轮导出刚发出同名事件就被
+ * 上一轮的残留认领走，等于提前放行、拿半渲染的窗口截图。再按 sender 过滤，
+ * 是为了并发导出时不互相认领对方的事件。
+ */
+function onceFromWindow<T>(
+  channel: string,
+  contents: Electron.WebContents,
+  timeoutMs: number,
+  message: string,
+  pick: (args: unknown[]) => T
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      ipcMain.removeListener(channel, handler);
+      fn();
+    };
+    const handler = (event: Electron.IpcMainEvent, ...args: unknown[]): void => {
+      if (event.sender !== contents) return;
+      finish(() => resolve(pick(args)));
+    };
+    const timer = setTimeout(() => finish(() => reject(new Error(message))), timeoutMs);
+    ipcMain.on(channel, handler);
+  });
+}
+
 /** 读取截图文件并转为 dataURL */
 export async function shotToDataUrl(path: string): Promise<string> {
   const buffer = await readFile(assertShotPath(path));
@@ -88,13 +120,7 @@ export async function exportCompose(input: ExportComposeInput): Promise<{ path: 
     win.webContents.send('export:render', payload);
 
     // 等待页面渲染 + 图片解码完成
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('导出渲染超时')), 20_000);
-      ipcMain.once('export:ready', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
+    await onceFromWindow('export:ready', win.webContents, 20_000, '导出渲染超时', () => undefined);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     // 布局视口扩到 scale 倍（真实窗口保持 1x，不受 OS 工作区钳制）
@@ -149,15 +175,17 @@ export async function exportCompose(input: ExportComposeInput): Promise<{ path: 
 
 /** WebP：把 PNG 交给导出窗口用 OffscreenCanvas.convertToBlob 编码 */
 function convertWebpInPage(win: BrowserWindow, png: Buffer, quality: number): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('WebP 编码超时')), 15_000);
-    ipcMain.once('export:webp:result', (_event, data: ArrayBuffer) => {
-      clearTimeout(timer);
-      resolve(Buffer.from(data));
-    });
-    win.webContents.send('export:webp:convert', {
-      dataUrl: `data:image/png;base64,${png.toString('base64')}`,
-      quality
-    });
+  // 先挂等待再发指令，避免渲染进程秒回时事件落在监听器建立之前
+  const pending = onceFromWindow<Buffer>(
+    'export:webp:result',
+    win.webContents,
+    15_000,
+    'WebP 编码超时',
+    ([data]) => Buffer.from(data as ArrayBuffer)
+  );
+  win.webContents.send('export:webp:convert', {
+    dataUrl: `data:image/png;base64,${png.toString('base64')}`,
+    quality
   });
+  return pending;
 }

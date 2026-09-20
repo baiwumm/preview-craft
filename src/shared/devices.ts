@@ -1,5 +1,12 @@
 export type DeviceId = 'desktop' | 'laptop' | 'tablet' | 'mobile';
 
+/**
+ * 截图采集倍率，与设置里的「导出倍率 1x/2x/3x」是两件事：
+ * 这里固定按 2 倍设备像素比采集，得到的是清晰的源图；导出倍率是在合成排版时
+ * 对整张画布做的放大。两者相乘才是最终像素，所以调导出倍率不会改变源图锐度。
+ */
+export const CAPTURE_DEVICE_SCALE = 2;
+
 /** 设备 UA：桌面 Chrome / iPad / iPhone */
 const DESKTOP_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';

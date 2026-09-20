@@ -12,7 +12,7 @@ import TemplateGallery from '@/components/TemplateGallery';
 import UrlBar, { type UrlBarHandle } from '@/components/UrlBar';
 import { useShortcuts } from '@/hooks/useShortcuts';
 import { useTheme } from '@/hooks/useTheme';
-import { cloneTemplate, defaultStyle, isTemplateModified, type StyleState } from '@/lib/design';
+import { cloneTemplate, defaultStyle, isTemplateModified } from '@/lib/design';
 import { describeBrowserKind, describeCaptureError } from '@/lib/format';
 import { deviceIds, devicePresets } from '@shared/devices';
 import { presets } from '@templates/presets';
@@ -23,6 +23,8 @@ import type {
   CaptureResult,
   DeviceId,
   EmbedProbeResult,
+  SessionSnapshot,
+  StyleState,
   Template
 } from '@shared/types';
 
@@ -115,14 +117,15 @@ export default function App(): ReactElement {
       .catch(() => toast('浏览器检测失败', { variant: 'danger' }));
   }, []);
 
-  // 启动：设置 / 自定义模板 / 浏览器检测并行拉取
+  // 启动：设置 / 自定义模板 / 浏览器检测 / 上次会话 并行拉取
   useEffect(() => {
     const load = async (): Promise<void> => {
-      const [nextSettings, custom, detection, version] = await Promise.all([
+      const [nextSettings, custom, detection, version, session] = await Promise.all([
         window.api?.settingsGet().catch(() => null) ?? Promise.resolve(null),
         window.api?.templatesGet().catch(() => null) ?? Promise.resolve(null),
         window.api?.browserDetect().catch(() => null) ?? Promise.resolve(null),
-        window.api?.appVersion().catch(() => '') ?? Promise.resolve('')
+        window.api?.appVersion().catch(() => '') ?? Promise.resolve(''),
+        window.api?.sessionGet().catch(() => null) ?? Promise.resolve(null)
       ]);
       setAppVersion(version);
 
@@ -137,6 +140,18 @@ export default function App(): ReactElement {
         setSource(startup.source);
       }
 
+      // 上次会话在「默认模板」之后应用：恢复的是用户关掉应用时的样子，优先级更高
+      if (session) {
+        setDesign({ template: session.template, style: { ...defaultStyle, ...session.style } });
+        setSource(
+          session.sourceTemplateId
+            ? [...presets, ...customList].find((t) => t.id === session.sourceTemplateId)
+            : undefined
+        );
+        urlBarRef.current?.restoreSession(session.mainUrl ?? '', session.deviceUrls ?? {});
+      }
+      hydrated.current = true;
+
       const hasBrowser =
         (detection?.found.length ?? 0) > 0 || Boolean(nextSettings?.browserPath);
       if (!hasBrowser) setGuideOpen(true);
@@ -144,6 +159,28 @@ export default function App(): ReactElement {
 
     void load();
   }, []);
+
+  /** 会话快照：恢复完成前不落盘（否则会把默认值写回去），落盘防抖 800ms */
+  const hydrated = useRef(false);
+  const sessionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (!hydrated.current || !window.api) return;
+    const snapshot: SessionSnapshot = {
+      mainUrl,
+      deviceUrls,
+      template: design.template,
+      sourceTemplateId: source?.id,
+      style: design.style
+    };
+    if (sessionTimer.current) clearTimeout(sessionTimer.current);
+    sessionTimer.current = setTimeout(() => {
+      window.api?.sessionSet(snapshot).catch(() => undefined);
+    }, 800);
+    return () => {
+      if (sessionTimer.current) clearTimeout(sessionTimer.current);
+    };
+  }, [mainUrl, deviceUrls, design, source]);
 
   // Chromium 下载进度（订阅一次，随下载状态展示）
   useEffect(() => {
@@ -233,40 +270,42 @@ export default function App(): ReactElement {
   }, [source]);
 
   const handleSaveTemplate = useCallback(
-    (name: string) => {
+    async (name: string) => {
       const template: Template = {
         ...cloneTemplate(design.template),
         id: `custom-${Date.now()}`,
         name,
         subtitle: '自定义模板'
       };
-      setCustomTemplates((prev) => {
-        if (window.api) {
-          window.api
-            .templatesSave(template)
-            .then(setCustomTemplates)
-            .catch(() => undefined);
-          return prev;
+      // IPC 不能写在 setState 的更新函数里：StrictMode 下更新函数会被双调用，
+      // dev 时真发两次 templatesSave（AGENTS.md 第三节红线）。
+      if (window.api) {
+        try {
+          setCustomTemplates(await window.api.templatesSave(template));
+        } catch {
+          toast('自定义模板保存失败', { variant: 'danger' });
+          return;
         }
-        return [...prev, template];
-      });
+      } else {
+        setCustomTemplates((prev) => [...prev, template]);
+      }
       setSource(template);
     },
     [design.template]
   );
 
   const handleDeleteCustom = useCallback(
-    (id: string) => {
-      setCustomTemplates((prev) => {
-        if (window.api) {
-          window.api
-            .templatesDelete(id)
-            .then(setCustomTemplates)
-            .catch(() => undefined);
-          return prev;
+    async (id: string) => {
+      if (window.api) {
+        try {
+          setCustomTemplates(await window.api.templatesDelete(id));
+        } catch {
+          toast('自定义模板删除失败', { variant: 'danger' });
+          return;
         }
-        return prev.filter((t) => t.id !== id);
-      });
+      } else {
+        setCustomTemplates((prev) => prev.filter((t) => t.id !== id));
+      }
       if (source?.id === id) setSource(undefined);
     },
     [source]
@@ -351,7 +390,13 @@ export default function App(): ReactElement {
 
       let result: CaptureResult;
       try {
-        result = await window.api.captureStart({ url: mainUrl, deviceUrls, devices });
+        // 把本轮要替换掉的旧截图交给主进程删文件，缓存才不会只进不出
+        const replacing: Partial<Record<DeviceId, string>> = {};
+        for (const device of devices) {
+          const old = shotPaths[device];
+          if (old) replacing[device] = old;
+        }
+        result = await window.api.captureStart({ url: mainUrl, deviceUrls, devices, replace: replacing });
       } catch (error) {
         const message = describeCaptureError(error instanceof Error ? error.message : String(error));
         toast(`截图失败：${message}`, {
@@ -476,10 +521,13 @@ export default function App(): ReactElement {
       if (!mainUrl || !window.api || job || retryingDevices.current.has(device)) return;
       retryingDevices.current.add(device);
       try {
+        const replacing: Partial<Record<DeviceId, string>> = {};
+        if (shotPaths[device]) replacing[device] = shotPaths[device];
         const result = await window.api.captureStart({
           url: mainUrl,
           deviceUrls,
-          devices: [device]
+          devices: [device],
+          replace: replacing
         });
         const path = result.shots[device];
         if (path) {
@@ -505,7 +553,7 @@ export default function App(): ReactElement {
         retryingDevices.current.delete(device);
       }
     },
-    [mainUrl, deviceUrls, job]
+    [mainUrl, deviceUrls, job, shotPaths]
   );
 
   /** Ctrl+V：焦点不在输入区时，把剪贴板文本贴进地址栏并刷新预览 */

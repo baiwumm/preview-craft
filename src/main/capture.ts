@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import puppeteer, { type Browser } from 'puppeteer-core';
@@ -9,7 +9,7 @@ import { app } from 'electron';
 
 import type { CacheStats, CaptureProgress, CaptureResult, CaptureStartInput, DeviceId } from '@shared/types';
 
-import { devicePresets, deviceIds } from '@shared/devices';
+import { devicePresets, deviceIds, CAPTURE_DEVICE_SCALE } from '@shared/devices';
 
 /** 截图与导出产物的临时目录（设置页「清除缓存」的作用域） */
 export function shotCacheDir(): string {
@@ -64,6 +64,62 @@ export async function cacheClear(): Promise<CacheStats> {
   return { files: removed, bytes };
 }
 
+/** 缓存兜底口径：总量超线就从旧往新删，但 1 小时内的产物一定不碰（可能正被画布引用） */
+const CACHE_MAX_BYTES = 400 * 1024 * 1024;
+const CACHE_KEEP_RECENT_MS = 60 * 60 * 1000;
+
+/** 删掉渲染进程声明「本轮不再引用」的旧截图；路径必须落在缓存目录内，越界一律不动 */
+async function dropCacheFiles(paths: (string | undefined)[], dir: string): Promise<number> {
+  const root = resolve(dir) + sep;
+  let removed = 0;
+  for (const path of paths) {
+    if (!path) continue;
+    const full = resolve(path);
+    if (!full.startsWith(root)) continue;
+    try {
+      await rm(full, { force: true });
+      removed += 1;
+    } catch {
+      // 已被删或被占用，跳过
+    }
+  }
+  return removed;
+}
+
+/** 容量兜底：按 mtime 从新到旧累计，超出上限的旧文件删掉 */
+async function sweepCache(dir: string): Promise<number> {
+  type Entry = { name: string; size: number; mtimeMs: number };
+  const files: Entry[] = [];
+  try {
+    for (const name of await readdir(dir)) {
+      try {
+        const info = await stat(join(dir, name));
+        if (info.isFile()) files.push({ name, size: info.size, mtimeMs: info.mtimeMs });
+      } catch {
+        // 单个文件读不到信息，忽略
+      }
+    }
+  } catch {
+    return 0;
+  }
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const cutoff = Date.now() - CACHE_KEEP_RECENT_MS;
+  let total = 0;
+  let removed = 0;
+  for (const file of files) {
+    total += file.size;
+    if (total <= CACHE_MAX_BYTES) continue;
+    if (file.mtimeMs > cutoff) continue;
+    try {
+      await rm(join(dir, file.name), { force: true });
+      removed += 1;
+    } catch {
+      // 被占用，跳过
+    }
+  }
+  return removed;
+}
+
 /**
  * 浏览器实例复用：连续截图不重复 launch。
  *
@@ -113,10 +169,14 @@ export async function closeBrowser(): Promise<void> {
 
 /** 带超时兜底的 Promise.race，超时返回 undefined 不中断流程 */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
-  return Promise.race([
-    promise,
-    new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ms);
+  });
+  // 不 clear 的话每次等待都会在事件循环里留一个最长 20s 的空转定时器
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 /** 单台设备的完整等待策略与截图 */
@@ -148,7 +208,7 @@ async function captureDevice(
     await page.setViewport({
       width: preset.viewport.width,
       height: preset.viewport.height,
-      deviceScaleFactor: 2,
+      deviceScaleFactor: CAPTURE_DEVICE_SCALE,
       isMobile: preset.isMobile,
       hasTouch: preset.hasTouch
     });
@@ -233,6 +293,8 @@ export async function captureStart(
   const browser = await launchBrowser(executablePath);
   const outDir = shotCacheDir();
   await mkdir(outDir, { recursive: true });
+  // 本轮不再引用的旧截图先删掉，否则缓存只进不出（唯一出口原先是全量「清除缓存」）
+  await dropCacheFiles(Object.values(input.replace ?? {}), outDir);
 
   const devices = input.devices.length > 0 ? input.devices : deviceIds;
   const result: CaptureResult = { shots: {}, errors: {} };
@@ -252,5 +314,6 @@ export async function captureStart(
     })
   );
 
+  await sweepCache(outDir);
   return result;
 }

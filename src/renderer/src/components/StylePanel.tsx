@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
 import { devicePresets } from '@shared/devices';
-import type { DeviceId, Placement, Template } from '@shared/types';
+import type { DeviceId, Placement, StyleState, Template } from '@shared/types';
 
 import {
   CHECKER_CSS,
@@ -15,7 +15,7 @@ import {
   type BackgroundPreset
 } from '@templates/backgrounds';
 
-import { buildCustomBackground, isCustomBackground, type StyleState } from '@/lib/design';
+import { buildCustomBackground, isCustomBackground } from '@/lib/design';
 
 function toColor(hex: string) {
   try {

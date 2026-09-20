@@ -18,6 +18,11 @@ export interface CaptureStartInput {
   url: string;
   deviceUrls: Partial<Record<DeviceId, string>>;
   devices: DeviceId[];
+  /**
+   * 本轮即将被替换掉的旧截图路径，主进程在开截前删掉这些文件。
+   * 不传就是只增不减 —— 每轮重截都会留一批没人再引用的 PNG 在临时目录里。
+   */
+  replace?: Partial<Record<DeviceId, string>>;
 }
 
 export interface CaptureResult {
@@ -43,6 +48,33 @@ export interface Template {
 }
 
 export type ExportFormat = 'png' | 'jpg' | 'webp';
+
+/** 会话级样式（不属于模板 schema，另存模板时不携带） */
+export interface StyleState {
+  /** 画布圆角 px */
+  borderRadius: number;
+  /** 设备阴影 */
+  shadow: boolean;
+  /** 画布整体缩放（视觉系数，1 = 适配铺满） */
+  zoom: number;
+  /** 自定义渐变起止色（hex） */
+  customFrom: string;
+  customTo: string;
+}
+
+/**
+ * 上次会话快照：重启后接着用。落盘的是排版与地址，不含截图本身
+ * （临时文件可能已被清理，恢复后由预览 iframe 重新渲染地址）。
+ */
+export interface SessionSnapshot {
+  mainUrl: string;
+  deviceUrls: Partial<Record<DeviceId, string>>;
+  /** 完整排版快照（含微调与背景），恢复时直接采用 */
+  template: Template;
+  /** 排版来源模板 id，用于「还原预设」与画廊选中态 */
+  sourceTemplateId?: string;
+  style: StyleState;
+}
 
 export interface ExportStyle {
   borderRadius: number;
@@ -128,11 +160,16 @@ export interface Api {
   exportWebpResult(data: ArrayBuffer): void;
   settingsGet(): Promise<AppSettings>;
   settingsSet(patch: Partial<AppSettings>): Promise<AppSettings>;
+  /** 上次会话快照（无则 null）；写入失败不抛错，静默丢弃即可 */
+  sessionGet(): Promise<SessionSnapshot | null>;
+  sessionSet(snapshot: SessionSnapshot): Promise<void>;
   /** 运行中的版本号（app.getVersion()），「关于」页展示用 */
   appVersion(): Promise<string>;
   /** 截图/导出临时缓存（temp/preview-craft）统计与清理 */
   cacheStats(): Promise<CacheStats>;
   cacheClear(): Promise<CacheStats>;
+  /** 在系统文件管理器里打开截图/导出缓存目录 */
+  cacheOpen(): Promise<{ opened: boolean }>;
   /** 主进程文件对话框选择浏览器可执行文件，取消返回 null */
   pickBrowserPath(): Promise<{ path: string | null }>;
   /** 主进程读取系统剪贴板文本（Ctrl+V 到 URL 输入用） */

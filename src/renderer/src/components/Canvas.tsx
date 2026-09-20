@@ -1,4 +1,4 @@
-import type { DeviceId, EmbedProbeResult, Template } from '@shared/types';
+import type { DeviceId, EmbedProbeResult, StyleState, Template } from '@shared/types';
 import type { ReactElement } from 'react';
 
 import { isTransparentBackground, resolveBackgroundCss, CHECKER_CSS } from '@templates/backgrounds';
@@ -6,7 +6,6 @@ import { isTransparentBackground, resolveBackgroundCss, CHECKER_CSS } from '@tem
 import DeviceFrame from './DeviceFrame';
 
 import { useFitScale } from '@/hooks/useFitScale';
-import type { StyleState } from '@/lib/design';
 
 interface CanvasProps {
   template: Template;

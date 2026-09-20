@@ -1,4 +1,5 @@
 import { Button, Description, Label, ListBox, ProgressBar, Select, Spinner } from '@heroui/react';
+import { CAPTURE_DEVICE_SCALE } from '@shared/devices';
 import { Camera, Download } from 'lucide-react';
 import type { ReactElement } from 'react';
 
@@ -114,6 +115,10 @@ export default function ExportPanel({
       </div>
       <Description>
         仅截图 = 用真实截图替换画布预览；导出 = 截图 + 合成排版，完成后弹出保存对话框并复制到剪贴板。
+      </Description>
+      <Description>
+        截图固定按 {CAPTURE_DEVICE_SCALE}x 设备像素比采集，上面的「导出倍率」是合成整张画布时的放大，
+        两者相乘才是最终像素，所以调倍率不会让源图变糊。
       </Description>
       <Description>快捷键：Ctrl+Enter 截图 · Ctrl+S 导出 · Ctrl+V 贴网址</Description>
 

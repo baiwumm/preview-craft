@@ -42,15 +42,26 @@ export default function ExportPage(): ReactElement {
   // 渲染完成后等待所有图片解码，再通知主进程 capturePage
   useEffect(() => {
     if (!payload) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = Date.now() + 15_000;
     const check = (): void => {
+      if (cancelled) return;
       const imgs = Array.from(document.images);
       if (imgs.every((i) => i.complete && i.naturalWidth > 0)) {
         window.api.exportReady();
-      } else {
-        setTimeout(check, 60);
+        return;
       }
+      // 到点就停：图片永不解码时让主进程的 20s 硬超时把错误抛给用户，
+      // 既不在这里无限轮询，也绝不在缺图时谎报就绪
+      if (Date.now() > deadline) return;
+      timer = setTimeout(check, 60);
     };
     check();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [payload]);
 
   if (!payload) return <div className="h-screen w-screen" />;

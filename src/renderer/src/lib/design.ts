@@ -1,17 +1,4 @@
-import type { DeviceId, Template } from '@shared/types';
-
-/** 会话级样式（不属于模板 schema，另存模板时不携带） */
-export interface StyleState {
-  /** 画布圆角 px */
-  borderRadius: number;
-  /** 设备阴影 */
-  shadow: boolean;
-  /** 画布整体缩放（视觉系数，1 = 适配铺满） */
-  zoom: number;
-  /** 自定义渐变起止色（hex） */
-  customFrom: string;
-  customTo: string;
-}
+import type { DeviceId, StyleState, Template } from '@shared/types';
 
 export const defaultStyle: StyleState = {
   borderRadius: 12,

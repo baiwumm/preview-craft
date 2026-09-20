@@ -1,20 +1,22 @@
 import { basename, join } from 'node:path';
 import { copyFile, readFile } from 'node:fs/promises';
-import { ClipboardItem, clipboard, dialog, BrowserWindow, app, ipcMain } from 'electron';
+import { ClipboardItem, clipboard, dialog, BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import type { CaptureStartInput, DeviceId } from '@shared/types';
 import { normalizeUrl } from '@shared/url';
 
 import { detectBrowsers, ensureBrowser } from './browser';
-import { cacheClear, cacheStats, captureStart, closeBrowser } from './capture';
+import { cacheClear, cacheStats, captureStart, closeBrowser, shotCacheDir } from './capture';
 import { assertShotPath, exportCompose, shotToDataUrl } from './export';
 import { probeEmbedding } from './probe';
 import { checkForUpdate, openReleasePage } from './update';
 import {
   deleteCustomTemplate,
   getCustomTemplates,
+  getSession,
   getSettings,
   saveCustomTemplate,
+  setSession,
   setSettings
 } from './store';
 
@@ -122,11 +124,18 @@ function registerIpc(): void {
 
   ipcMain.handle('settings:set', (_event, patch) => setSettings(patch));
 
+  ipcMain.handle('session:get', () => getSession());
+
+  ipcMain.handle('session:set', (_event, snapshot) => setSession(snapshot));
+
   ipcMain.handle('app:version', () => app.getVersion());
 
   ipcMain.handle('cache:stats', () => cacheStats());
 
   ipcMain.handle('cache:clear', () => cacheClear());
+
+  // openPath 成功返回空串，失败返回错误描述
+  ipcMain.handle('cache:open', async () => ({ opened: (await shell.openPath(shotCacheDir())) === '' }));
 
   ipcMain.handle('dialog:pick-browser', async () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
