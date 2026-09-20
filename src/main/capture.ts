@@ -64,26 +64,51 @@ export async function cacheClear(): Promise<CacheStats> {
   return { files: removed, bytes };
 }
 
-/** 浏览器实例复用：连续截图不重复 launch */
-let browserPromise: Promise<Browser> | null = null;
+/**
+ * 浏览器实例复用：连续截图不重复 launch。
+ *
+ * 三条纪律，缺一条就会把用户困在「只能重启应用」里：
+ * - 失败的 promise 不能留着（一次 launch 失败会让之后每次截图都拿到同一个 rejection）
+ * - 实例断连（Chrome 崩了 / 被任务管理器杀掉）即清缓存，下一次重新 launch
+ * - 缓存要连带路径一起记，否则「设置 → 浏览器」换了路径也不生效
+ */
+let cached: { path: string; promise: Promise<Browser> } | null = null;
 
 export function launchBrowser(executablePath: string): Promise<Browser> {
-  if (!browserPromise) {
-    browserPromise = puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: ['--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--mute-audio']
-    });
-  }
-  return browserPromise;
+  if (cached?.path === executablePath) return cached.promise;
+
+  const previous = cached;
+  const entry: { path: string; promise: Promise<Browser> } = {
+    path: executablePath,
+    promise: (async () => {
+      if (previous) {
+        const old = await previous.promise.catch(() => null);
+        await old?.close().catch(() => undefined);
+      }
+      const browser = await puppeteer.launch({
+        executablePath,
+        headless: true,
+        args: ['--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--mute-audio']
+      });
+      browser.once('disconnected', () => {
+        if (cached === entry) cached = null;
+      });
+      return browser;
+    })().catch((error: unknown) => {
+      if (cached === entry) cached = null;
+      throw error;
+    })
+  };
+  cached = entry;
+  return entry.promise;
 }
 
 export async function closeBrowser(): Promise<void> {
-  if (browserPromise) {
-    const browser = await browserPromise.catch(() => null);
-    await browser?.close().catch(() => undefined);
-    browserPromise = null;
-  }
+  const entry = cached;
+  cached = null;
+  if (!entry) return;
+  const browser = await entry.promise.catch(() => null);
+  await browser?.close().catch(() => undefined);
 }
 
 /** 带超时兜底的 Promise.race，超时返回 undefined 不中断流程 */
