@@ -65,7 +65,3 @@ export const presets: Template[] = [
     ]
   }
 ];
-
-export function getPresetById(id: string): Template | undefined {
-  return presets.find((preset) => preset.id === id);
-}
