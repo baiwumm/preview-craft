@@ -1111,6 +1111,46 @@ async function runAppSection() {
 
     /* --- 7. UI：模板切换 / 样式微调 / 另存自定义模板 --- */
     await focusAppWindow(page);
+
+    /* 按钮图标是纯视觉项，改坏了不会报错、只会悄悄「变回纯文字」，故立常驻判据。
+       按 aria-label / 文案逐枚点名，不用 `header button svg` 计数 —— 顶栏的手风琴
+       触发器也是 button，且 HeroUI 的指示箭头同样是 svg，计数口径会被它带偏。
+       尺寸由 HeroUI Button 的 CSS 统一给（实测顶栏按钮内 16×16），svg 上再写死
+       Tailwind 尺寸类会和它打架，所以「渲染多大」和「有没有乱写尺寸」要一起验。 */
+    const iconState = await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('header button')];
+      const icons = ['刷新预览', '截图（Ctrl+Enter）', '打开设置', '切换明暗主题'].map((needle) => {
+        const button = buttons.find(
+          (b) => (b.getAttribute('aria-label') ?? '').includes(needle) || b.textContent?.trim() === needle
+        );
+        const box = button?.querySelector('svg')?.getBoundingClientRect();
+        return {
+          needle,
+          found: Boolean(button),
+          lucide: Boolean(button?.querySelector('svg.lucide')),
+          edge: box ? [Math.round(box.width), Math.round(box.height)] : null
+        };
+      });
+      return {
+        icons,
+        missing: icons.filter((i) => !i.found || !i.lucide).map((i) => i.needle),
+        hardcoded: [...document.querySelectorAll('button svg')].filter((s) =>
+          /(^|\s)(?:size|w|h)-\d+(?:\.\d+)?(?=\s|$)/.test(s.getAttribute('class') ?? '')
+        ).length
+      };
+    });
+    check(
+      '顶栏四枚按钮各带一枚 lucide 图标',
+      iconState.missing.length === 0,
+      iconState.missing.length ? `缺：${iconState.missing.join('、')}` : '4/4'
+    );
+    check(
+      '图标渲染成 12~26px 方块（没被压成 0）',
+      iconState.icons.every((i) => i.edge && i.edge[0] >= 12 && i.edge[0] <= 26 && i.edge[0] === i.edge[1]),
+      iconState.icons.map((i) => `${i.needle}=${JSON.stringify(i.edge)}`).join(' ')
+    );
+    check('图标不写死尺寸类（尺寸交给 Button 的 CSS）', iconState.hardcoded === 0, `${iconState.hardcoded} 个带尺寸类`);
+
     await tap(page, locator('[role="tab"]', '模板'));
     await waitTrue('切到模板页签', tabSelected('模板'));
     const galleryCount = await page.evaluate(() => document.querySelectorAll('aside [role="button"]').length);
