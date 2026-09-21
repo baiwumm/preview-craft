@@ -19,6 +19,7 @@
  */
 import { execSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync, appendFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -51,6 +52,9 @@ const BAD_HOST = 'https://preview-craft-smoke-nonexistent.invalid';
 const MOBILE_OVERRIDE_URL = 'https://example.com';
 const ALL_DEVICES = ['desktop', 'laptop', 'tablet', 'mobile'];
 const CAPTURE_TIMEOUT = 300_000;
+
+/** 本地内嵌探测夹具页：/deny 带 X-Frame-Options，/open 不带 */
+const EMBED_FIXTURE_HTML = '<!doctype html><title>embed fixture</title><p>preview-craft smoke embed fixture</p>';
 
 const results = [];
 const skips = [];
@@ -695,6 +699,9 @@ async function runAppSection() {
     );
   };
 
+  /** 本地内嵌夹具站点，在 try 内起、finally 关（声明必须在外层，否则 finally 取不到） */
+  let embedServer = null;
+
   try {
     /** 弹窗是否仍在（HeroUI Modal 关闭后节点移除，按可见高度判断） */
     const modalOpen = () =>
@@ -863,6 +870,26 @@ async function runAppSection() {
     check('并发 captureStart 被主进程互斥挡下', firstShot === 'ok' && /还在进行中/.test(secondShot), `${firstShot} | ${secondShot}`);
 
     /* --- 2. 预览：非法 URL / 主 URL / 分设备覆盖 --- */
+    // 本地可控的「拒绝内嵌 / 允许内嵌」站点。这两条分支原先借外站真实响应头，
+    // 本机网络一抖就整轮 SKIP、覆盖率被静默吞掉；判定逻辑在 A 段有 6 条纯逻辑断言，
+    // 这里要补的是「探测 → embedHints → 占位渲染」那段端到端接线。
+    // 可行性依据：normalizeUrl 只要求 hostname 含点（127.0.0.1 过），CSP 是 frame-src http: https:。
+    embedServer = createServer((req, res) => {
+      const blocked = String(req.url).startsWith('/deny');
+      const body = EMBED_FIXTURE_HTML;
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': Buffer.byteLength(body),
+        ...(blocked ? { 'X-Frame-Options': 'DENY' } : {})
+      });
+      res.end(body);
+    });
+    await new Promise((resolve) => embedServer.listen(0, '127.0.0.1', resolve));
+    const embedBase = `http://127.0.0.1:${embedServer.address().port}`;
+    const DENY_URL = `${embedBase}/deny`;
+    const OPEN_URL = `${embedBase}/open`;
+    log(`本地内嵌夹具站点 ${embedBase}（/deny 带 XFO，/open 不带）`);
+
     await page.bringToFront();
     const urlInput = 'input[placeholder^="输入网址"]';
     await typeInto(page, urlInput, 'not a valid url');
@@ -881,39 +908,33 @@ async function runAppSection() {
     check('主 URL 回车渲染 4 台预览 iframe', state.frames.length === 4, state.frames.map((f) => f.title).join(','));
     check('预览 iframe 指向主地址', state.frames.every((f) => f.src.includes('github.com')));
 
-    /* 3b. 内嵌可行性探测：判定逻辑在 A 段纯测；这里只验真实网络链路与占位渲染。
-       本机到 github.com 常要 10s 上下，探测失败时按「未探到」跳过严格断言，不算回归。 */
-    const probeBlockedSite = await soft('previewProbe 拒绝内嵌站点', () => api('previewProbe', SITE));
-    const siteProbed = probeBlockedSite?.probed === true;
-    if (!siteProbed) {
-      skip('previewProbe 对拒绝内嵌站点的判定', `站点 ${SITE} 探测未成功（网络），本轮未验到拦截分支`);
-    } else {
-      check(
-        'previewProbe 对拒绝内嵌站点的判定',
-        probeBlockedSite.blocked === true && /X-Frame-Options|frame-ancestors/.test(probeBlockedSite.reason ?? ''),
-        JSON.stringify(probeBlockedSite)
-      );
-    }
-    const probeOpenSite = await soft('previewProbe 可内嵌站点', () => api('previewProbe', 'https://example.com'));
+    /* 3b. 内嵌可行性探测：走本地夹具站点，结论确定、不依赖外网。 */
+    const probeDeny = await api('previewProbe', DENY_URL);
     check(
-      'previewProbe 放行可内嵌站点',
-      probeOpenSite?.probed === false || probeOpenSite?.blocked === false,
-      JSON.stringify(probeOpenSite)
+      'previewProbe 判定拒绝内嵌站点（本地夹具）',
+      probeDeny?.probed === true && probeDeny?.blocked === true && probeDeny?.reason === 'X-Frame-Options: DENY',
+      JSON.stringify(probeDeny)
+    );
+    const probeOpen = await api('previewProbe', OPEN_URL);
+    check(
+      'previewProbe 放行可内嵌站点（本地夹具）',
+      probeOpen?.probed === true && probeOpen?.blocked === false,
+      JSON.stringify(probeOpen)
     );
 
-    // 触发一次「刷新预览」，让渲染侧取到（可能刚重试成功的）探测结果
-    await tap(page, locator('button', '刷新预览'));
-    if (siteProbed && probeBlockedSite.blocked) {
-      check(
-        '被拦站点在画布上给出占位说明',
-        await waitTrue('等拦截占位出现', `document.body.innerText.includes('该站点禁止内嵌预览')`, undefined, 20_000)
-      );
-    } else {
-      skip(
-        '被拦站点在画布上给出占位说明',
-        siteProbed ? `站点 ${SITE} 允许内嵌，本轮无拦截分支可验` : `站点 ${SITE} 探测未成功（网络）`
-      );
-    }
+    // 占位渲染：把被拦地址贴进地址栏，画布该给说明而不是四片白
+    await typeInto(page, urlInput, DENY_URL);
+    await page.keyboard.press('Enter');
+    check(
+      '被拦站点在画布上给出占位说明',
+      await waitTrue('等拦截占位出现', `document.body.innerText.includes('该站点禁止内嵌预览')`, undefined, 25_000)
+    );
+    // 复位到主站点：后面的分设备覆盖 / 截图 / 导出用例仍按 SITE 跑
+    await typeInto(page, urlInput, SITE.replace(/^https?:\/\//, ''));
+    await page.keyboard.press('Enter');
+    await soft('等预览回到主站点', () =>
+      page.waitForFunction(() => document.querySelectorAll('main iframe').length === 4, { timeout: 30_000 })
+    );
 
     await tap(page, locator('span', '分设备 URL', false));
     await sleep(800);
@@ -1406,6 +1427,12 @@ async function runAppSection() {
     check('无未捕获脚本异常', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
     log(`      IPC 调用 ${calls.length} 次，覆盖 ${[...new Set(calls)].length} 个通道`);
   } finally {
+    try {
+      embedServer?.closeAllConnections?.();
+      embedServer?.close();
+    } catch {
+      /* 夹具站点没起来或已关 */
+    }
     try {
       await browser?.disconnect();
     } catch {
