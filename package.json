@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
     "smoke": "node scripts/smoke.mjs",
+    "gen:icon": "node scripts/gen-icon.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm build && node scripts/smoke.mjs",
     "start": "electron-vite preview"
   },
