@@ -3,21 +3,17 @@ node_modules/
 
 # 构建产物
 out/
-dist/
 release/
 
 # Electron
 *.local
 
 # 日志
-logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
 
 # 编辑器
-.vscode/*
-!.vscode/extensions.json
 .idea/
 
 # 系统文件
@@ -30,9 +26,6 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
-
-# 测试
-coverage/
 
 # 冒烟测试产物与隔离档案
 .smoke-out/
