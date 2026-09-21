@@ -55,7 +55,8 @@ PreviewCraft 是一个 Electron 桌面工具，面向需要展示「同一站点
 
 ## 开发
 
-环境要求：Windows 10 / 11、Node 20+、pnpm 9+；本机装有 Chrome 或 Edge（否则在应用内下载 Chromium）。
+环境要求：Windows 10 / 11、Node 22.18+ 或 24+、pnpm 9+；本机装有 Chrome 或 Edge（否则在应用内下载 Chromium）。
+`pnpm smoke` 与 `pnpm gen:icon` 直接跑 `src/` 下的 `.ts`，依赖 Node 的原生类型擦除，Node 20 跑不起来（本仓库在 Node 24 上验证）。
 
 ```bash
 pnpm install        # .npmrc 已配置 Electron 与 electron-builder 二进制镜像（国内网络）
@@ -67,7 +68,12 @@ pnpm smoke          # 全量冒烟：纯逻辑断言 + 真实应用 CDP 端到�
 pnpm verify         # typecheck + lint + build + smoke 一条龙
 pnpm dist           # 打包 NSIS 安装包到 release/（首次运行见下方镜像说明）
 pnpm dist:dir       # 只出免安装目录 release/win-unpacked/，用于快速冒烟
+pnpm gen:icon       # resources/icon.svg → icon.png（512×512 RGBA），改完图标必须跑
 ```
+
+`pnpm gen:icon`（`scripts/gen-icon.mjs`）用本机 Chrome/Edge 把 svg 光栅化成 `resources/icon.png`：
+它是图标的**唯一源文件**，png 只是产物 —— `electron-builder` 构建期再把 png 转成 exe 的 ICO，
+dev 态窗口直接读 png。改 svg 后不重跑这一步，包里的图标就还是旧的。
 
 `pnpm smoke`（`scripts/smoke.mjs`）覆盖 URL 校验、设备几何、5 套预设越界检查、背景与样式解析、错误归因，
 以及起真实应用后的截图（4 台 2x 尺寸逐台断言）、导出（PNG/JPG/WebP × 1x/2x/3x、透明底 alpha、垫白）、
@@ -96,6 +102,7 @@ src/
 │  └─ templates/       模板 schema、5 套预设、背景板
 └─ shared/          # 三层共用的类型契约、设备 preset、URL 规范化、版本号比较
 scripts/smoke.mjs   # 常驻全量冒烟（纯逻辑 + 真实应用 CDP）
+scripts/gen-icon.mjs # 图标源 svg → 512×512 PNG（`pnpm gen:icon`）
 docs/PLAN.md        # 开发计划与各阶段执行记录
 ```
 
